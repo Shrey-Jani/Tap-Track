@@ -1,0 +1,326 @@
+# TapTrack — Payment Tracking App
+
+A mobile app that records card-tap payments and provides daily spending summaries with zero data leakage.
+
+---
+
+## Tech Stack Recommendation
+
+| Layer | Choice | Why |
+|-------|--------|-----|
+| **OS Target** | **iOS first, Android built-in** | iOS has stricter security sandbox. Cross-platform framework gives Android free. |
+| **Language** | **TypeScript** | Type safety catches bugs at compile time. Self-documenting types replace comments. |
+| **Framework** | **React Native (Expo)** | Cross-platform from day one. Expo provides secure storage, biometrics, and camera APIs out of the box. |
+| **Local Database** | **WatermelonDB** (SQLite under the hood) | Fast, encrypted, reactive queries. Data never leaves the device. |
+| **Encryption** | **react-native-encrypted-storage** + **expo-crypto** | AES-256 encryption for all stored payment data. |
+| **Auth** | **expo-local-authentication** | Biometric (Face ID / fingerprint) lock — no passwords to leak. |
+| **State Management** | **Zustand** | Minimal boilerplate, TypeScript-first, no Redux ceremony. |
+| **UI** | **React Native Paper** (Material Design 3) | Polished components, dark mode, accessibility built-in. |
+| **Testing** | **Jest + React Native Testing Library** | Unit + integration tests for every data layer. |
+
+> [!IMPORTANT]
+> **Why not native Swift/Kotlin?** React Native with Expo gives us both platforms with one codebase, TypeScript's type system makes code self-documenting (matching your clean-code goal), and the security libraries are production-grade. If performance bottlenecks appear later, we can eject specific modules to native.
+
+---
+
+## Architecture Overview
+
+```mermaid
+graph TB
+    subgraph Presentation["🖥️ Presentation Layer"]
+        A["HomeScreen"]
+        B["AddPaymentScreen"]
+        C["DailySummaryScreen"]
+        D["SettingsScreen"]
+    end
+
+    subgraph Logic["⚙️ Business Logic Layer"]
+        E["usePayments hook"]
+        F["useDailySummary hook"]
+        G["useBudgetAlerts hook"]
+        H["PaymentValidator"]
+    end
+
+    subgraph Data["💾 Data Layer (Encrypted)"]
+        I["PaymentRepository"]
+        J["CategoryRepository"]
+        K["WatermelonDB + AES-256"]
+    end
+
+    subgraph Security["🔒 Security Layer"]
+        L["BiometricGate"]
+        M["EncryptionService"]
+        N["SecureStorageService"]
+    end
+
+    A --> E
+    B --> E
+    C --> F
+    A --> G
+    E --> H
+    H --> I
+    F --> I
+    I --> K
+    J --> K
+    K --> M
+    L --> A
+    M --> N
+end
+```
+
+### Layer Responsibilities
+
+| Layer | Responsibility | Security Rule |
+|-------|---------------|---------------|
+| **Presentation** | UI rendering, user input, animations | No raw data in component state — only formatted display values |
+| **Business Logic** | Validation, calculations, summaries | All amounts handled as integers (cents) to avoid float errors |
+| **Data** | CRUD operations, queries, caching | Every read/write goes through encryption service |
+| **Security** | Auth, encryption, secure storage | App locks after 30s background. Biometric required to unlock. |
+
+---
+
+## Data Models
+
+```typescript
+// All monetary values stored as integers (cents) to prevent floating-point errors
+
+interface Payment {
+  id: string;                    // UUID v4
+  amountInCents: number;         // e.g., 1599 = $15.99
+  merchantName: string;          // "Starbucks"
+  category: PaymentCategory;     // enum: FOOD, TRANSPORT, SHOPPING, etc.
+  cardLastFourDigits: string;    // "4521" — only last 4, never full card number
+  timestamp: number;             // Unix epoch ms
+  note?: string;                 // optional user note
+  isRecurring: boolean;          // flag for subscriptions
+}
+
+enum PaymentCategory {
+  FOOD = "FOOD",
+  TRANSPORT = "TRANSPORT",
+  SHOPPING = "SHOPPING",
+  ENTERTAINMENT = "ENTERTAINMENT",
+  BILLS = "BILLS",
+  HEALTH = "HEALTH",
+  OTHER = "OTHER",
+}
+
+interface DailySummary {
+  date: string;                  // "2026-04-14"
+  totalSpentInCents: number;
+  transactionCount: number;
+  categoryBreakdown: Record<PaymentCategory, number>;
+  largestPayment: Payment;
+  averagePaymentInCents: number;
+}
+
+interface UserPreferences {
+  currency: string;              // "USD", "INR", "EUR"
+  dailyBudgetInCents: number;    // alert threshold
+  biometricEnabled: boolean;
+  darkModeEnabled: boolean;
+}
+```
+
+> [!CAUTION]
+> **We NEVER store**: full card numbers, CVVs, PINs, bank account numbers, or any PCI-regulated data. Only the last 4 digits of the card are stored for identification purposes.
+
+---
+
+## Security Strategy — Zero Data Leakage
+
+```mermaid
+flowchart LR
+    A["App Launch"] --> B{"Biometric\nVerified?"}
+    B -- Yes --> C["Decrypt DB Key\nfrom Secure Enclave"]
+    B -- No --> D["Lock Screen\n3 attempts max"]
+    C --> E["Open Encrypted DB"]
+    E --> F["App Ready"]
+    F --> G{"App goes to\nBackground?"}
+    G -- ">30 seconds" --> A
+    G -- "<30 seconds" --> F
+    D -- "3 failures" --> H["Wipe Session\nRequire Re-auth"]
+```
+
+### Security Measures
+
+| Threat | Mitigation |
+|--------|------------|
+| **Data at rest** | AES-256 encrypted SQLite database. Key stored in iOS Keychain / Android Keystore. |
+| **Data in memory** | Sensitive fields cleared from state on background. No logging of payment amounts. |
+| **Screenshots** | `react-native-screen-capture` blocks screenshots and screen recording. |
+| **Rooted/Jailbroken devices** | Detection via `expo-device` — warn user, optionally block app. |
+| **No cloud sync** | All data stays on-device. No analytics, no telemetry, no third-party SDKs that phone home. |
+| **Clipboard attacks** | Payment amounts are never copied to clipboard. |
+| **Debug builds** | Production builds strip all `console.log`. Hermes bytecode prevents easy reverse engineering. |
+
+---
+
+## Feature Breakdown (Phased)
+
+### Phase 1 — Core MVP (Week 1-2)
+- [ ] "Tap to Add Payment" screen — amount, merchant, category picker
+- [ ] Payment list (today's transactions)
+- [ ] Daily summary card (total spent, transaction count, category pie chart)
+- [ ] Encrypted local database setup
+- [ ] Dark mode support
+- [ ] Default currency: **CAD** (Canadian Dollar)
+
+### Phase 2 — Enhanced Tracking (Week 3)
+- [ ] Multiple card support (last 4 digits identification)
+- [ ] Search and filter payments by date range
+- [ ] Category-based spending breakdown with charts
+- [ ] Daily budget alerts (push notification when threshold hit)
+- [ ] Export daily summary as PDF (generated on-device, not uploaded)
+
+### Phase 3 — Smart Features (Week 4)
+- [ ] Recurring payment detection and reminders
+- [ ] Spending trends (week-over-week comparison)
+- [ ] Quick-add from notification (log payment without opening app)
+- [ ] Widget for iOS/Android home screen showing today's spend
+
+### Phase 4 — Security & Future (Post-Launch)
+- [ ] **Biometric lock screen on app launch** (Face ID / Fingerprint)
+- [ ] Bank SMS parsing (auto-detect payments from bank texts — opt-in)
+- [ ] Optional encrypted cloud backup (user-controlled E2E encryption key)
+- [ ] Multi-currency support with offline conversion rates
+
+---
+
+## Project Structure
+
+```
+TrackApp/
+├── app/                          # Expo Router screens
+│   ├── (auth)/
+│   │   └── lock.tsx              # Biometric lock screen
+│   ├── (tabs)/
+│   │   ├── index.tsx             # Home — today's payments
+│   │   ├── add.tsx               # Add payment screen
+│   │   ├── summary.tsx           # Daily summary screen
+│   │   └── settings.tsx          # Settings screen
+│   └── _layout.tsx               # Root layout with auth gate
+│
+├── components/
+│   ├── PaymentCard.tsx           # Single payment display
+│   ├── DailySummaryCard.tsx      # Summary stats card
+│   ├── CategoryPicker.tsx        # Category selection grid
+│   ├── AmountInput.tsx           # Secure amount input
+│   ├── SpendingChart.tsx         # Pie/bar chart component
+│   └── BiometricPrompt.tsx       # Biometric auth UI
+│
+├── hooks/
+│   ├── usePayments.ts            # CRUD operations for payments
+│   ├── useDailySummary.ts        # Compute daily aggregations
+│   ├── useBudgetAlert.ts         # Budget threshold logic
+│   └── useBiometricAuth.ts       # Biometric authentication
+│
+├── services/
+│   ├── EncryptionService.ts      # AES-256 encrypt/decrypt
+│   ├── SecureStorageService.ts   # Keychain/Keystore wrapper
+│   ├── PaymentRepository.ts      # Database operations
+│   ├── CategoryRepository.ts     # Category data access
+│   └── PaymentValidator.ts       # Input validation & sanitization
+│
+├── models/
+│   ├── Payment.ts                # Payment type & schema
+│   ├── Category.ts               # Category enum & types
+│   ├── DailySummary.ts           # Summary type
+│   └── UserPreferences.ts        # Settings type
+│
+├── store/
+│   └── appStore.ts               # Zustand global state
+│
+├── utils/
+│   ├── formatCurrency.ts         # cents → display string
+│   ├── dateHelpers.ts            # Date manipulation utilities
+│   └── constants.ts              # App-wide constants
+│
+├── database/
+│   ├── schema.ts                 # WatermelonDB schema
+│   ├── migrations.ts             # DB migrations
+│   └── index.ts                  # DB initialization with encryption
+│
+└── __tests__/                    # Mirror of src structure
+    ├── services/
+    ├── hooks/
+    └── utils/
+```
+
+---
+
+## Clean Code Conventions
+
+Following your requirement — **function names ARE the documentation**:
+
+```typescript
+// ✅ GOOD — Name tells the full story, no comment needed
+function calculateDailyTotalInCents(payments: Payment[]): number
+
+function filterPaymentsByDate(payments: Payment[], targetDate: Date): Payment[]
+
+function encryptAndStorePayment(payment: Payment): Promise<void>
+
+function buildCategoryBreakdown(payments: Payment[]): Record<PaymentCategory, number>
+
+function validatePaymentAmount(amountInCents: number): ValidationResult
+
+function authenticateWithBiometrics(): Promise<AuthResult>
+
+function formatCentsToDisplayCurrency(cents: number, currency: string): string
+
+
+// ❌ BAD — Vague name needs a comment to explain
+function process(data: any): any  // processes payment data ???
+
+function calc(p: Payment[]): number  // calculates... what?
+
+function handle(e: Event): void  // handles... how?
+```
+
+### Naming Rules We'll Follow
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Functions | verb + noun + context | `fetchPaymentsByDateRange` |
+| Booleans | is/has/should prefix | `isRecurring`, `hasExceededBudget` |
+| Handlers | handle + event | `handlePaymentSubmit` |
+| Constants | SCREAMING_SNAKE | `MAX_RETRY_ATTEMPTS` |
+| Types | PascalCase, descriptive | `PaymentCategory`, `DailySummary` |
+| Files | PascalCase components, camelCase utils | `PaymentCard.tsx`, `formatCurrency.ts` |
+
+---
+
+## Verification Plan
+
+### Automated Tests
+```bash
+# Unit tests for all services and utils
+npx jest --coverage
+
+# Specific security tests
+npx jest __tests__/services/EncryptionService.test.ts
+npx jest __tests__/services/PaymentValidator.test.ts
+```
+
+### Security Verification
+- [ ] Run `npx expo-doctor` to check for known vulnerabilities
+- [ ] Verify no sensitive data appears in `console.log` output
+- [ ] Test app behavior on background/foreground transitions (biometric re-prompt)
+- [ ] Verify encrypted DB file is unreadable without the app context
+
+### Manual Verification
+- [ ] Add 5+ payments and verify daily summary accuracy
+- [ ] Kill app and reopen — verify biometric prompt appears
+- [ ] Take screenshot while app is open — verify it's blocked/blurred
+- [ ] Check that exported PDF contains correct data
+
+---
+
+## Open Questions
+
+**Resolved:**
+- ✅ **Payment Entry**: Manual quick-tap UI for MVP. SMS parsing in Phase 4.
+- ✅ **Target Devices**: Both iOS and Android. Testing on both.
+- ✅ **Currency**: CAD (Canadian Dollar) as default.
+- ✅ **Biometric**: Moved to Phase 4 (last phase).
