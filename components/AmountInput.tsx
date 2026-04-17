@@ -13,14 +13,14 @@ const AmountInput: React.FC<AmountInputProps> = ({onAmountChange}) => {
     
 
     const parsed = parseFloat(text);
-    const ampuntInCents = isNaN(parsed) ? 0 :Math.round(parsed * 100);
+    const amountInCents = isNaN(parsed) ? 0 :Math.round(parsed * 100);
 
-    onAmountChange(ampuntInCents);
+    onAmountChange(amountInCents);
 };
 
 return(
     <View style={styles.container}>
-        <Text style={styles.currencySymbol}>₹</Text>
+        <Text style={styles.currencySymbol}>$</Text>
         <TextInput 
         style={styles.input}
         onChangeText={handleTextChange}
