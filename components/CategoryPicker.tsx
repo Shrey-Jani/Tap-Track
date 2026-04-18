@@ -35,6 +35,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({selectedCategory, onSele
                         isSelected && styles.categoryNameSelected,
                     ]}
                     numberOfLines={1}>
+                    {category}
                     </Text>
                     </TouchableOpacity>
                 );

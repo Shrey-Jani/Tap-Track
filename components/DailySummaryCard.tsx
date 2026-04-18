@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     },
 
     totalValue: {
-        color:"#4ADE0",
+        color:"#4ADE80",
         fontSize: 20,
     },
 });

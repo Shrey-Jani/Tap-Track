@@ -48,7 +48,7 @@ const AddPaymentScreen: React.FC = () => {
             style = {styles.container}
             contentContainerStyle = {styles.contentContainer}
             keyboardShouldPersistTaps = "handled">
-                <Text style={styles.container}>Add Payment</Text>
+                <Text style={styles.title}>Add Payment</Text>
 
                 <AmountInput onAmountChange={setAmountInCents}/>
 
