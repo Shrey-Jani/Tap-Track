@@ -56,3 +56,5 @@ const TabIcon: React.FC<TabIconProps> = ({name, color}) => (
       </Tabs>
     );
   };
+
+  export default TabLayout;
