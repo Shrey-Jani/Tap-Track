@@ -6,18 +6,18 @@ export function validatePaymentInput(amountInCents: number,
     cardLastFourDigits: string,)
     {
     if (amountInCents <= 0){
-        return {error: "Amount must be greater than zero"};
+        return {isValid:false ,error: "Amount must be greater than zero"};
     }
     if (amountInCents > 99999999){
-        return {error: "Amount exceeds maximum limit"};
+        return {isValid:false ,error: "Amount exceeds maximum limit"};
     }
 
     if (!merchantName.trim()){
-        return {error: "Merchant Name is required"};
+        return {eisValid:false ,rror: "Merchant Name is required"};
     }
 
     if(!/^\d{4}$/.test(cardLastFourDigits)){
-        return {error: "Card must be exactly 4 digits"}
+        return {isValid:false ,error: "Card must be exactly 4 digits"}
     }
     return{
         isValid: true,

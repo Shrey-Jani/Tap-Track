@@ -12,8 +12,8 @@ const AmountInput: React.FC<AmountInputProps> = ({onAmountChange}) => {
         setDisplayText(text);
     
 
-    const parsed = parseFloat(text);
-    const amountInCents = isNaN(parsed) ? 0 :Math.round(parsed * 100);
+        const parsed = parseFloat(text);
+        const amountInCents = isNaN(parsed) ? 0 :Math.round(parsed * 100);
 
     onAmountChange(amountInCents);
 };

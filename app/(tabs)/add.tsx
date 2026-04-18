@@ -54,9 +54,20 @@ const AddPaymentScreen: React.FC = () => {
 
                 <TextInput style={styles.textInput} placeholder="Merchant Name" value={merchantName} onChangeText={setMerchantName} placeholderTextColor="#888"/>
 
+                <TextInput 
+                    style={styles.textInput} 
+                    placeholder="Last 4 digits of card" 
+                    value={cardLastFourDigits} 
+                    onChangeText={setCardLastFourDigits}
+                    placeholderTextColor="#888"
+                    maxLength={4}
+                    keyboardType="number-pad"
+/>
+
+
                 <CategoryPicker selectedCategory={selectedCategory} onSelectedCategory={setSelectedCategory}/>
 
-                <TextInput style={[styles.textInput, styles.noteInput]} placeholder="For note" value="note" onChangeText={setNote} 
+                <TextInput style={[styles.textInput, styles.noteInput]} placeholder="For note" value={note} onChangeText={setNote} 
                 placeholderTextColor={"#888"} multiline/>
 
                 <TouchableOpacity 
