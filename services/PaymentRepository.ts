@@ -1,6 +1,6 @@
 import { Payment } from "@/models/payment";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { v4 as uuidv4 } from "uuid";
+import * as Crypto from "expo-crypto";
 
 
 const STORAGE_KEY_PAYMENTS = "PAYMENT_LIST";
@@ -26,7 +26,7 @@ export async function saveAllPayments(payments: Payment[]): Promise<void> {
 export async function addPayment(payment:Omit<Payment, "id" | "timestamp">): Promise<Payment>{
     const newPayment: Payment = {
         ...payment,
-        id: uuidv4(),
+        id: Crypto.randomUUID(),
         timestamp: Date.now()
     };
 

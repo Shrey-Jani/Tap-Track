@@ -4,10 +4,9 @@ import { PaymentCard } from "@/components/PaymentCard";
 import { useBudgetAlert } from "@/hooks/useBudgetAlert";
 import { useDailySummary } from "@/hooks/useDailySummary";
 import { usePayments } from "@/hooks/usePayments";
-import { DEFAULT_DAILY_BUDGET_IN_CENTS } from "@/utils/constants";
-import { useAppstore } from "@/store/appStore";
 import { Payment } from "@/models/payment";
-import React from "react";
+import { useAppstore } from "@/store/appStore";
+import React, { useEffect } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 
 const EmptyPaymentList:React.FC = () => (
@@ -17,10 +16,13 @@ const EmptyPaymentList:React.FC = () => (
 const HomeScreen:React.FC = () => {
   const {payment, removePayment, isLoading} = usePayments();
   const Summary = useDailySummary(payment);
-  const {selectedDate, setSelectedDate} = useAppstore();
-  
-  useBudgetAlert(Summary.totalSpentInCents,
-  DEFAULT_DAILY_BUDGET_IN_CENTS);
+  const {selectedDate, setSelectedDate, dailyBudgetInCents, loadBudget} = useAppstore();
+
+  useEffect(() => {
+      loadBudget();
+  }, []);
+
+  useBudgetAlert(Summary.totalSpentInCents, dailyBudgetInCents);
   
   
   if(isLoading){

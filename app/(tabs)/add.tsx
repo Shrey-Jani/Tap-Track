@@ -4,7 +4,8 @@ import { usePayments } from "@/hooks/usePayments";
 import { PaymentCategory } from "@/models/payment";
 import { validatePaymentInput } from "@/services/PaymentValidator";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -22,6 +23,18 @@ const AddPaymentScreen: React.FC = () => {
     const [selectedCategory, setSelectedCategory] = useState<PaymentCategory>(PaymentCategory.OTHER);
     const [cardLastFourDigits, setCardLastFourDigits] = useState<string>("");
     const [note, setNote] = useState<string>("");
+    const [formKey, setFormKey] = useState<number>(0);
+
+    useFocusEffect(
+        useCallback(() => {
+            setAmountInCents(0);
+            setMerchantName("");
+            setSelectedCategory(PaymentCategory.OTHER);
+            setCardLastFourDigits("");
+            setNote("");
+            setFormKey((prev) => prev + 1);
+        }, [])
+    );
 
     const handleAddPayment = () => {
         const result = validatePaymentInput(amountInCents, merchantName, selectedCategory, cardLastFourDigits);
@@ -50,7 +63,7 @@ const AddPaymentScreen: React.FC = () => {
             keyboardShouldPersistTaps = "handled">
                 <Text style={styles.title}>Add Payment</Text>
 
-                <AmountInput onAmountChange={setAmountInCents}/>
+                <AmountInput key={formKey} onAmountChange={setAmountInCents}/>
 
                 <TextInput style={styles.textInput} placeholder="Merchant Name" value={merchantName} onChangeText={setMerchantName} placeholderTextColor="#888"/>
 

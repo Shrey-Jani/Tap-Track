@@ -6,17 +6,19 @@ export const useBudgetAlert = (totalSpentInCents: number, budgetInCents: number)
     const hasAlerted = useRef<boolean>(false);
 
     useEffect(() => {
-        if(budgetInCents <= 0) return;
+        if (budgetInCents <= 0) return;
 
-        if(totalSpentInCents >= budgetInCents && !hasAlerted.current) {
+        if (totalSpentInCents >= budgetInCents && !hasAlerted.current) {
             hasAlerted.current = true;
-            Alert.alert(
-                "Budget Alert 🚨",
-                `You've spent ${formatCentstoDisplayCurrency(totalSpentInCents)} out of your ${formatCentstoDisplayCurrency(budgetInCents)} monthly budget!`,
-                [{text: "OK"}]
-            );
+            setTimeout(() => {
+                Alert.alert(
+                    "Budget Alert 🚨",
+                    `You've spent ${formatCentstoDisplayCurrency(totalSpentInCents)} today, exceeding your ${formatCentstoDisplayCurrency(budgetInCents)} daily budget!`,
+                    [{ text: "OK" }]
+                );
+            }, 500);
         }
-        if (totalSpentInCents < budgetInCents){
+        if (totalSpentInCents < budgetInCents) {
             hasAlerted.current = false;
         }
     }, [totalSpentInCents, budgetInCents]);
