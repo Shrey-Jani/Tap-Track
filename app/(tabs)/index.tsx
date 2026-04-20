@@ -1,11 +1,14 @@
-import { DailySummaryCard } from '@/components/DailySummaryCard';
-import { PaymentCard } from '@/components/PaymentCard';
-import { Text, View } from '@/components/Themed';
-import { useDailySummary } from '@/hooks/useDailySummary';
-import { usePayments } from '@/hooks/usePayments';
-import { Payment } from '@/models/payment';
-import React from 'react';
-import { ActivityIndicator, FlatList, StyleSheet } from 'react-native';
+import { DailySummaryCard } from "@/components/DailySummaryCard";
+import DateRangePicker from "@/components/DateRangePicker";
+import { PaymentCard } from "@/components/PaymentCard";
+import { useBudgetAlert } from "@/hooks/useBudgetAlert";
+import { useDailySummary } from "@/hooks/useDailySummary";
+import { usePayments } from "@/hooks/usePayments";
+import { DEFAULT_DAILY_BUDGET_IN_CENTS } from "@/utils/constants";
+import { useAppstore } from "@/store/appStore";
+import { Payment } from "@/models/payment";
+import React from "react";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 
 const EmptyPaymentList:React.FC = () => (
   <Text style={styles.emptyText}>No Payments yet. Tap + to add one. </Text>
@@ -14,6 +17,11 @@ const EmptyPaymentList:React.FC = () => (
 const HomeScreen:React.FC = () => {
   const {payment, removePayment, isLoading} = usePayments();
   const Summary = useDailySummary(payment);
+  const {selectedDate, setSelectedDate} = useAppstore();
+  
+  useBudgetAlert(Summary.totalSpentInCents,
+  DEFAULT_DAILY_BUDGET_IN_CENTS);
+  
   
   if(isLoading){
     return(
@@ -26,6 +34,8 @@ const HomeScreen:React.FC = () => {
   return(
     <View style = {styles.container}>
       <Text style = {styles.title}>Tap Track</Text>
+
+       <DateRangePicker selectedDate={selectedDate} onDateChange={setSelectedDate} />
 
       <DailySummaryCard summary={Summary}/>
 
