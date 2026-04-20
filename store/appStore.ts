@@ -11,6 +11,7 @@ interface AppState{
     loadTodayPayments: () => Promise<void>,
     addNewPayment: (payment: Omit<Payment, "id" | "timestamp">) => Promise<void>,
     removePayment: (id: string) => Promise<void>
+    setSelectedDate: (date: Date) => void,
 };
 
 export const useAppstore = create<AppState>((set, get) => ({
@@ -36,6 +37,11 @@ export const useAppstore = create<AppState>((set, get) => ({
     
     removePayment: async(id) => {
         await deletePayment(id);
+        await get().loadTodayPayments();
+    },
+
+    setSelectedDate: async(date) => {
+        set({selectedDate: date});
         await get().loadTodayPayments();
     }
 }));
