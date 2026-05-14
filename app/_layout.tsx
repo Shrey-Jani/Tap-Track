@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
 
+import LockOverlay from '@/components/LockOverlay';
 import { useColorScheme } from '@/components/useColorScheme';
 import {
   configureNotificationHandler,
@@ -15,6 +16,8 @@ import {
   NOTIFICATION_TAP_ACTION,
   postPersistentQuickAddNotification,
 } from '@/services/NotificationService';
+import { refreshSpendingWidget } from '@/services/WidgetService';
+import { useAuthStore } from '@/store/authStore';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -55,6 +58,10 @@ export default function RootLayout() {
   useEffect(() => {
     configureNotificationHandler();
 
+    refreshSpendingWidget().catch(() => undefined);
+
+    useAuthStore.getState().loadBiometricEnabled();
+
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) {
         navigateToAddScreenIfTapAction(response.notification.request.content.data?.action);
@@ -66,10 +73,23 @@ export default function RootLayout() {
     });
 
     const appStateSubscription = AppState.addEventListener('change', async (nextState) => {
-      if (nextState === 'active' && Platform.OS === 'ios') {
-        const persistentEnabled = await loadPersistentEnabled();
-        if (persistentEnabled) {
-          await postPersistentQuickAddNotification();
+      const authStore = useAuthStore.getState();
+
+      if (nextState === 'background' || nextState === 'inactive') {
+        authStore.setBackgroundedAt(Date.now());
+      }
+
+      if (nextState === 'active') {
+        if (authStore.shouldLockAfterBackground()) {
+          authStore.setAuthenticated(false);
+        }
+        authStore.setBackgroundedAt(null);
+
+        if (Platform.OS === 'ios') {
+          const persistentEnabled = await loadPersistentEnabled();
+          if (persistentEnabled) {
+            await postPersistentQuickAddNotification();
+          }
         }
       }
     });
@@ -96,6 +116,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
+      <LockOverlay />
     </ThemeProvider>
   );
 }
