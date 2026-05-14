@@ -1,6 +1,11 @@
+import Card from "@/design/Card";
+import { spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
 import { SpendingTrends } from "@/services/SpendingTrendsCalculator";
+import { useAppstore } from "@/store/appStore";
 import { formatCentstoDisplayCurrency } from "@/utils/formatCurrency";
-import React from "react";
+import { Feather } from "@expo/vector-icons";
+import React, { useMemo } from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 
@@ -9,127 +14,141 @@ interface SpendingTrendsCardProps {
 }
 
 const SpendingTrendsCard: React.FC<SpendingTrendsCardProps> = ({ trends }) => {
+    const { palette, gradients, mode } = useTheme();
+    const currencyCode = useAppstore((s) => s.currencyCode);
     const chartWidth = Dimensions.get("window").width - 64;
     const { dailyData, thisWeekTotalCents, lastWeekTotalCents, percentChangeFromLastWeek } = trends;
 
-    const hasSpendingThisWeek = dailyData.some((day) => day.totalCents > 0);
+    const hasSpending = dailyData.some((d) => d.totalCents > 0);
     const isUp = percentChangeFromLastWeek > 0;
     const isDown = percentChangeFromLastWeek < 0;
-    const directionArrow = isUp ? "↑" : isDown ? "↓" : "•";
-    const changeColor = isUp ? "#F87171" : isDown ? "#4ADE80" : "#888";
+    const trendColor = isUp ? palette.semantic.danger : isDown ? palette.semantic.success : palette.text.muted;
+    const trendIcon = isUp ? "trending-up" : isDown ? "trending-down" : "minus";
+
+    const chartTextColor = mode === "light"
+        ? "rgba(10, 10, 18, 0.55)"
+        : "rgba(255, 255, 255, 0.55)";
+    const brandRgb = mode === "light" ? "22, 163, 74" : "74, 222, 128";
+
+    const styles = useMemo(() => StyleSheet.create({
+        headerRow: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: spacing.md,
+        },
+        title: {
+            ...typography.h3,
+            color: palette.text.primary,
+        },
+        pill: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 999,
+            borderWidth: 1,
+        },
+        pillText: {
+            ...typography.caption,
+            fontWeight: "700",
+        },
+        compareRow: {
+            flexDirection: "row",
+            gap: spacing.lg,
+            marginBottom: spacing.md,
+        },
+        compareCol: { flex: 1 },
+        compareLabel: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginBottom: 4,
+        },
+        compareValueBright: {
+            ...typography.h2,
+            color: palette.brand.primary,
+            fontVariant: ["tabular-nums"],
+        },
+        compareValueDim: {
+            ...typography.h2,
+            color: palette.text.secondary,
+            fontVariant: ["tabular-nums"],
+        },
+        chart: {
+            marginLeft: -spacing.lg,
+            borderRadius: 8,
+        },
+        emptyText: {
+            ...typography.caption,
+            color: palette.text.muted,
+            textAlign: "center",
+            marginVertical: spacing.lg,
+        },
+    }), [palette]);
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>📈 Weekly Trends</Text>
+        <Card padding={spacing.lg}>
+            <View style={styles.headerRow}>
+                <Text style={styles.title}>Weekly Trends</Text>
+                <View style={[styles.pill, { borderColor: trendColor + "55", backgroundColor: trendColor + "11" }]}>
+                    <Feather name={trendIcon as "trending-up" | "trending-down" | "minus"} size={12} color={trendColor} />
+                    {lastWeekTotalCents > 0 && (
+                        <Text style={[styles.pillText, { color: trendColor }]}>
+                            {Math.abs(percentChangeFromLastWeek).toFixed(0)}%
+                        </Text>
+                    )}
+                </View>
+            </View>
 
-            <View style={styles.summaryRow}>
-                <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>This Week</Text>
-                    <Text style={styles.summaryValue}>
-                        {formatCentstoDisplayCurrency(thisWeekTotalCents)}
+            <View style={styles.compareRow}>
+                <View style={styles.compareCol}>
+                    <Text style={styles.compareLabel}>This week</Text>
+                    <Text style={styles.compareValueBright}>
+                        {formatCentstoDisplayCurrency(thisWeekTotalCents, currencyCode)}
                     </Text>
                 </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Last Week</Text>
-                    <Text style={[styles.summaryValue, styles.muted]}>
-                        {formatCentstoDisplayCurrency(lastWeekTotalCents)}
+                <View style={styles.compareCol}>
+                    <Text style={styles.compareLabel}>Last week</Text>
+                    <Text style={styles.compareValueDim}>
+                        {formatCentstoDisplayCurrency(lastWeekTotalCents, currencyCode)}
                     </Text>
                 </View>
             </View>
 
-            {lastWeekTotalCents > 0 && (
-                <Text style={[styles.changeText, { color: changeColor }]}>
-                    {directionArrow} {Math.abs(percentChangeFromLastWeek).toFixed(0)}% vs last week
-                </Text>
-            )}
-
-            {hasSpendingThisWeek ? (
+            {hasSpending ? (
                 <BarChart
                     data={{
                         labels: dailyData.map((d) => d.dateLabel),
                         datasets: [{ data: dailyData.map((d) => d.totalCents / 100) }],
                     }}
                     width={chartWidth}
-                    height={180}
-                    yAxisLabel="$"
+                    height={170}
+                    yAxisLabel=""
                     yAxisSuffix=""
                     fromZero
-                    showValuesOnTopOfBars={false}
+                    withInnerLines={false}
+                    withHorizontalLabels={false}
                     chartConfig={{
-                        backgroundColor: "#1E1E2E",
-                        backgroundGradientFrom: "#1E1E2E",
-                        backgroundGradientTo: "#1E1E2E",
+                        backgroundColor: palette.bg.surface,
+                        backgroundGradientFrom: palette.bg.surface,
+                        backgroundGradientTo: palette.bg.surface,
                         decimalPlaces: 0,
-                        color: (opacity = 1) => `rgba(74, 222, 128, ${opacity})`,
-                        labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                        barPercentage: 0.6,
+                        color: (opacity = 1) => `rgba(${brandRgb}, ${opacity})`,
+                        labelColor: () => chartTextColor,
+                        barPercentage: 0.55,
+                        fillShadowGradientFrom: gradients.brand[0],
+                        fillShadowGradientTo: gradients.brand[1],
+                        fillShadowGradientFromOpacity: 1,
+                        fillShadowGradientToOpacity: 0.4,
                     }}
                     style={styles.chart}
                 />
             ) : (
                 <Text style={styles.emptyText}>No spending in the past 7 days</Text>
             )}
-        </View>
+        </Card>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        backgroundColor: "#1E1E2E",
-        borderRadius: 16,
-        padding: 16,
-        marginTop: 16,
-    },
-    title: {
-        color: "#FFFFFF",
-        fontSize: 16,
-        fontWeight: "bold",
-        marginBottom: 12,
-    },
-    summaryRow: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    summaryItem: {
-        flex: 1,
-    },
-    summaryDivider: {
-        width: 1,
-        height: 32,
-        backgroundColor: "#2A2A3C",
-        marginHorizontal: 12,
-    },
-    summaryLabel: {
-        color: "#888",
-        fontSize: 12,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        marginBottom: 4,
-    },
-    summaryValue: {
-        color: "#4ADE80",
-        fontSize: 20,
-        fontWeight: "700",
-    },
-    muted: {
-        color: "#AAAAAA",
-    },
-    changeText: {
-        marginTop: 10,
-        fontSize: 13,
-        fontWeight: "600",
-    },
-    chart: {
-        marginTop: 12,
-        borderRadius: 8,
-    },
-    emptyText: {
-        color: "#888",
-        fontSize: 13,
-        marginTop: 16,
-        textAlign: "center",
-    },
-});
 
 export default SpendingTrendsCard;

@@ -1,24 +1,30 @@
 import AmountInput from "@/components/AmountInput";
 import CategoryPicker from "@/components/CategoryPicker";
+import PrimaryButton from "@/design/PrimaryButton";
+import { radii, spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
 import { usePayments } from "@/hooks/usePayments";
 import { PaymentCategory } from "@/models/payment";
 import { validatePaymentInput } from "@/services/PaymentValidator";
 import { parseSmsToPayment } from "@/services/SmsParser";
+import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     Alert,
     Modal,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
 } from "react-native";
 
 const AddPaymentScreen: React.FC = () => {
+    const { palette } = useTheme();
     const { addNewPayment } = usePayments();
 
     const [amountInCents, setAmountInCents] = useState<number>(0);
@@ -44,12 +50,12 @@ const AddPaymentScreen: React.FC = () => {
 
     const handleAddPayment = () => {
         const result = validatePaymentInput(amountInCents, merchantName, selectedCategory, cardLastFourDigits);
-
         if (!result.isValid) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
             Alert.alert("Error", result.errorMessage);
             return;
         }
-
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         addNewPayment({
             amountInCents,
             merchantName,
@@ -58,14 +64,13 @@ const AddPaymentScreen: React.FC = () => {
             note,
             isRecurring: false,
         });
-
         router.back();
     };
 
     const handleParseSms = () => {
         const parsed = parseSmsToPayment(smsText);
         if (!parsed) {
-            Alert.alert("Couldn't parse", "No amount found. Paste a bank notification SMS that mentions an amount.");
+            Alert.alert("Couldn't parse", "No amount found in the SMS text.");
             return;
         }
         setAmountInCents(parsed.amountInCents);
@@ -75,194 +80,198 @@ const AddPaymentScreen: React.FC = () => {
         setFormKey((prev) => prev + 1);
         setShowSmsModal(false);
         setSmsText("");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     };
+
+    const styles = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: palette.bg.base },
+        content: { paddingTop: 60, paddingHorizontal: spacing.lg, paddingBottom: 120 },
+        headerRow: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            marginBottom: spacing.xl,
+        },
+        kicker: {
+            ...typography.caption,
+            color: palette.text.muted,
+            textTransform: "uppercase",
+            letterSpacing: 1,
+        },
+        title: {
+            ...typography.h1,
+            color: palette.text.primary,
+            marginTop: 2,
+        },
+        smsBtn: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            backgroundColor: palette.bg.surface,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: palette.border.brand,
+        },
+        smsBtnText: {
+            ...typography.caption,
+            color: palette.brand.primary,
+            fontWeight: "700",
+        },
+        fieldLabel: {
+            ...typography.label,
+            color: palette.text.secondary,
+            marginTop: spacing.lg,
+            marginBottom: spacing.sm,
+        },
+        textInput: {
+            backgroundColor: palette.bg.surface,
+            color: palette.text.primary,
+            padding: 16,
+            borderRadius: radii.md,
+            fontSize: 16,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: palette.border.subtle,
+        },
+        noteInput: {
+            minHeight: 80,
+            textAlignVertical: "top",
+        },
+        modalBackdrop: {
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "center",
+            padding: 20,
+        },
+        modalCard: {
+            backgroundColor: palette.bg.surface,
+            borderRadius: radii.xl,
+            padding: spacing.lg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: palette.border.subtle,
+        },
+        modalTitle: {
+            ...typography.h2,
+            color: palette.text.primary,
+            marginBottom: 6,
+        },
+        modalHint: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginBottom: spacing.md,
+        },
+        smsTextArea: {
+            minHeight: 100,
+            textAlignVertical: "top",
+            marginBottom: spacing.md,
+        },
+        modalRow: {
+            flexDirection: "row",
+            gap: 8,
+            alignItems: "center",
+        },
+        modalCancel: {
+            backgroundColor: palette.bg.surfaceAlt,
+            paddingVertical: 16,
+            paddingHorizontal: 22,
+            borderRadius: radii.md,
+            alignItems: "center",
+        },
+        modalCancelText: {
+            ...typography.h3,
+            color: palette.text.secondary,
+        },
+    }), [palette]);
 
     return (
         <ScrollView
             style={styles.container}
-            contentContainerStyle={styles.contentContainer}
+            contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
         >
-            <Text style={styles.title}>Add Payment</Text>
-
-            <TouchableOpacity style={styles.smsButton} onPress={() => setShowSmsModal(true)}>
-                <Text style={styles.smsButtonText}>📩 Paste SMS to auto-fill</Text>
-            </TouchableOpacity>
+            <View style={styles.headerRow}>
+                <View>
+                    <Text style={styles.kicker}>New entry</Text>
+                    <Text style={styles.title}>Add Payment</Text>
+                </View>
+                <Pressable style={styles.smsBtn} onPress={() => setShowSmsModal(true)} hitSlop={8}>
+                    <Feather name="message-square" size={16} color={palette.brand.primary} />
+                    <Text style={styles.smsBtnText}>Paste SMS</Text>
+                </Pressable>
+            </View>
 
             <AmountInput key={formKey} onAmountChange={setAmountInCents} />
 
-            <TextInput style={styles.textInput} placeholder="Merchant Name" value={merchantName} onChangeText={setMerchantName} placeholderTextColor="#888" />
-
+            <Text style={styles.fieldLabel}>Merchant</Text>
             <TextInput
                 style={styles.textInput}
-                placeholder="Last 4 digits of card"
+                placeholder="Starbucks, Uber, …"
+                value={merchantName}
+                onChangeText={setMerchantName}
+                placeholderTextColor={palette.text.muted}
+            />
+
+            <Text style={styles.fieldLabel}>Card (last 4)</Text>
+            <TextInput
+                style={styles.textInput}
+                placeholder="1234"
                 value={cardLastFourDigits}
                 onChangeText={setCardLastFourDigits}
-                placeholderTextColor="#888"
+                placeholderTextColor={palette.text.muted}
                 maxLength={4}
                 keyboardType="number-pad"
             />
 
+            <Text style={styles.fieldLabel}>Category</Text>
             <CategoryPicker selectedCategory={selectedCategory} onSelectedCategory={setSelectedCategory} />
 
+            <Text style={styles.fieldLabel}>Note (optional)</Text>
             <TextInput
                 style={[styles.textInput, styles.noteInput]}
-                placeholder="For note"
+                placeholder="Anything to remember?"
                 value={note}
                 onChangeText={setNote}
-                placeholderTextColor={"#888"}
+                placeholderTextColor={palette.text.muted}
                 multiline
             />
 
-            <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleAddPayment}
-                accessibilityLabel="Add payment"
-                accessibilityRole="button"
-            >
-                <Text style={styles.submitButtonText}>Add Payment</Text>
-            </TouchableOpacity>
+            <View style={{ marginTop: spacing.lg }}>
+                <PrimaryButton
+                    label="Save Payment"
+                    onPress={handleAddPayment}
+                    icon={<Feather name="check" size={18} color="#FFFFFF" />}
+                />
+            </View>
 
             <Modal visible={showSmsModal} animationType="slide" transparent>
-                <View style={styles.modalBackdrop}>
-                    <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Paste Bank SMS</Text>
+                <Pressable style={styles.modalBackdrop} onPress={() => setShowSmsModal(false)}>
+                    <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+                        <Text style={styles.modalTitle}>Paste bank SMS</Text>
                         <Text style={styles.modalHint}>
-                            Copy a transaction SMS from your bank and paste it below. We'll extract the amount, merchant, and card.
+                            Copy a transaction SMS, paste below. We'll extract amount, merchant, and card.
                         </Text>
                         <TextInput
                             style={[styles.textInput, styles.smsTextArea]}
-                            placeholder="e.g. INR 850 spent on card ending 4521 at SWIGGY on 14-May-26"
+                            placeholder="e.g. ₹850 spent on card ending 4521 at SWIGGY"
                             value={smsText}
                             onChangeText={setSmsText}
-                            placeholderTextColor="#666"
+                            placeholderTextColor={palette.text.muted}
                             multiline
                         />
                         <View style={styles.modalRow}>
-                            <TouchableOpacity style={styles.modalCancel} onPress={() => setShowSmsModal(false)}>
+                            <Pressable style={styles.modalCancel} onPress={() => setShowSmsModal(false)}>
                                 <Text style={styles.modalCancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.modalConfirm} onPress={handleParseSms}>
-                                <Text style={styles.modalConfirmText}>Auto-fill</Text>
-                            </TouchableOpacity>
+                            </Pressable>
+                            <View style={{ flex: 1 }}>
+                                <PrimaryButton label="Auto-fill" onPress={handleParseSms} />
+                            </View>
                         </View>
-                    </View>
-                </View>
+                    </Pressable>
+                </Pressable>
             </Modal>
         </ScrollView>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#121218",
-    },
-    contentContainer: {
-        padding: 20,
-        paddingBottom: 40,
-    },
-    title: {
-        color: "#FFFFFF",
-        fontSize: 28,
-        fontWeight: "bold",
-        marginBottom: 20,
-    },
-    smsButton: {
-        backgroundColor: "#2A2A3C",
-        borderWidth: 1,
-        borderColor: "#4ADE80",
-        borderRadius: 12,
-        padding: 14,
-        alignItems: "center",
-        marginBottom: 16,
-    },
-    smsButtonText: {
-        color: "#4ADE80",
-        fontSize: 14,
-        fontWeight: "600",
-    },
-    textInput: {
-        backgroundColor: "#1E1E2E",
-        color: "#FFFFFF",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-        fontSize: 16,
-    },
-    noteInput: {
-        marginTop: 12,
-        minHeight: 80,
-        textAlignVertical: "top",
-    },
-    submitButton: {
-        backgroundColor: "#4ADE80",
-        borderRadius: 12,
-        padding: 16,
-        alignItems: "center",
-        marginTop: 8,
-    },
-    submitButtonText: {
-        color: "#000000",
-        fontSize: 16,
-        fontWeight: "bold",
-    },
-    modalBackdrop: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.7)",
-        justifyContent: "center",
-        padding: 20,
-    },
-    modalCard: {
-        backgroundColor: "#1E1E2E",
-        borderRadius: 16,
-        padding: 20,
-    },
-    modalTitle: {
-        color: "#FFFFFF",
-        fontSize: 20,
-        fontWeight: "bold",
-        marginBottom: 8,
-    },
-    modalHint: {
-        color: "#888",
-        fontSize: 13,
-        marginBottom: 16,
-    },
-    smsTextArea: {
-        minHeight: 100,
-        textAlignVertical: "top",
-    },
-    modalRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 8,
-    },
-    modalCancel: {
-        flex: 1,
-        backgroundColor: "#2A2A3C",
-        padding: 14,
-        borderRadius: 12,
-        alignItems: "center",
-        marginRight: 8,
-    },
-    modalCancelText: {
-        color: "#FFFFFF",
-        fontSize: 15,
-    },
-    modalConfirm: {
-        flex: 1,
-        backgroundColor: "#4ADE80",
-        padding: 14,
-        borderRadius: 12,
-        alignItems: "center",
-        marginLeft: 8,
-    },
-    modalConfirmText: {
-        color: "#000",
-        fontSize: 15,
-        fontWeight: "bold",
-    },
-});
 
 export default AddPaymentScreen;

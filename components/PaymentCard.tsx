@@ -1,96 +1,147 @@
+import { CATEGORY_GRADIENTS, radii, spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
 import { Payment } from "@/models/payment";
+import { useAppstore } from "@/store/appStore";
+import { CATEGORY_ICONS } from "@/utils/constants";
 import { formatCentstoDisplayCurrency } from "@/utils/formatCurrency";
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { CATEGORY_ICONS } from "../utils/constants";
+import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useMemo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
+} from "react-native-reanimated";
 
-interface PaymentCardProps{
-    payment: Payment,
-    onDelete : (id: string) => void;
+interface PaymentCardProps {
+    payment: Payment;
+    onDelete: (id: string) => void;
 }
 
-export const PaymentCard: React.FC<PaymentCardProps> = ({payment, onDelete}) => {
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export const PaymentCard: React.FC<PaymentCardProps> = ({ payment, onDelete }) => {
+    const { palette } = useTheme();
+    const currencyCode = useAppstore((s) => s.currencyCode);
+    const scale = useSharedValue(1);
+    const opacity = useSharedValue(1);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+        opacity: opacity.value,
+    }));
+
     const handleDelete = () => {
-        onDelete(payment.id);
-    } 
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+        opacity.value = withTiming(0, { duration: 200 });
+        setTimeout(() => onDelete(payment.id), 200);
+    };
+
+    const handlePressIn = () => {
+        scale.value = withSpring(0.98, { damping: 16, stiffness: 320 });
+    };
+
+    const handlePressOut = () => {
+        scale.value = withSpring(1, { damping: 16, stiffness: 320 });
+    };
+
+    const gradient = CATEGORY_GRADIENTS[payment.category];
+
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: palette.bg.surface,
+            padding: spacing.md,
+            borderRadius: radii.lg,
+            marginBottom: spacing.sm,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: palette.border.subtle,
+        },
+        iconBubble: {
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            justifyContent: "center",
+            alignItems: "center",
+            marginRight: spacing.md,
+        },
+        icon: { fontSize: 20 },
+        middle: { flex: 1, minWidth: 0 },
+        merchant: {
+            ...typography.bodyStrong,
+            color: palette.text.primary,
+        },
+        metaRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 3,
+        },
+        category: {
+            ...typography.caption,
+            color: palette.text.secondary,
+        },
+        dot: {
+            width: 3,
+            height: 3,
+            borderRadius: 2,
+            backgroundColor: palette.text.muted,
+            marginHorizontal: 6,
+        },
+        cardChip: {
+            ...typography.caption,
+            color: palette.text.muted,
+            fontVariant: ["tabular-nums"],
+        },
+        right: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+        },
+        amount: {
+            ...typography.bodyStrong,
+            color: palette.text.primary,
+            fontVariant: ["tabular-nums"],
+        },
+    }), [palette]);
 
     return (
-        <View style={styles.container}>
-            <View style={styles.iconContainer}>
-                <Text style={styles.paymentCategory}>
-                    {CATEGORY_ICONS[payment.category]}
+        <AnimatedPressable
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            style={[styles.container, animatedStyle]}
+        >
+            <LinearGradient
+                colors={gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.iconBubble}
+            >
+                <Text style={styles.icon}>{CATEGORY_ICONS[payment.category]}</Text>
+            </LinearGradient>
+
+            <View style={styles.middle}>
+                <Text style={styles.merchant} numberOfLines={1}>{payment.merchantName}</Text>
+                <View style={styles.metaRow}>
+                    <Text style={styles.category}>{payment.category}</Text>
+                    <View style={styles.dot} />
+                    <Text style={styles.cardChip}>•••• {payment.cardLastFourDigits}</Text>
+                </View>
+            </View>
+
+            <View style={styles.right}>
+                <Text style={styles.amount}>
+                    {formatCentstoDisplayCurrency(payment.amountInCents, currencyCode)}
                 </Text>
+                <Pressable onPress={handleDelete} hitSlop={10}>
+                    <Feather name="x" size={16} color={palette.text.muted} />
+                </Pressable>
             </View>
+        </AnimatedPressable>
+    );
+};
 
-            <View style={styles.contentContainer}>
-                <Text style={styles.merchantName}>{payment.merchantName}</Text>
-                <Text style={styles.categoryText}>{payment.category}</Text>
-            </View>
-
-            <View style={styles.rightContainer}>
-                <Text style={styles.amountText}>
-                    {formatCentstoDisplayCurrency(payment.amountInCents)}
-                </Text>
-                <TouchableOpacity onPress={handleDelete} >
-                    <Text style={styles.deleteIcon}>✕</Text>
-        </TouchableOpacity>
-            </View>
-        </View>
-    
-        
-    )
-}
-
-const styles = StyleSheet.create({
-    container: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#fff",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-        shadowColor: "#000",
-        shadowOffset: {width: 0, height: 2},
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: "#f0f0f0",
-        justifyContent: "center",
-        alignItems: "center",
-        marginRight: 12,
-    },
-    paymentCategory: {
-        fontSize: 24,
-    },
-    contentContainer: {
-        flex: 1,
-    },
-    merchantName: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#333",
-    },
-    categoryText: {
-        fontSize: 14,
-        color: "#666",
-    },
-    rightContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    amountText: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#333",
-        marginRight: 12,
-    },
-    deleteIcon: {
-        fontSize: 20,
-        color: "#ff4444",
-    },
-});
+export default PaymentCard;

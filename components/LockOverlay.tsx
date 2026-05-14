@@ -1,27 +1,33 @@
+import PrimaryButton from "@/design/PrimaryButton";
+import { spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
 import {
     authenticateWithBiometrics,
     BiometricKind,
     checkBiometricAvailability,
 } from "@/services/BiometricAuthService";
 import { useAuthStore } from "@/store/authStore";
-import React, { useCallback, useEffect, useState } from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Modal, StyleSheet, Text, View } from "react-native";
 
 const BIOMETRIC_LABELS: Record<BiometricKind, string> = {
     face: "Face ID",
     fingerprint: "Fingerprint",
-    iris: "Iris",
-    none: "Biometric",
+    iris: "Iris Scan",
+    none: "Device unlock",
 };
 
-const BIOMETRIC_ICONS: Record<BiometricKind, string> = {
-    face: "👤",
-    fingerprint: "👆",
-    iris: "👁",
-    none: "🔒",
+const BIOMETRIC_ICONS: Record<BiometricKind, React.ComponentProps<typeof Feather>["name"]> = {
+    face: "user",
+    fingerprint: "shield",
+    iris: "eye",
+    none: "lock",
 };
 
 const LockOverlay: React.FC = () => {
+    const { palette, gradients, mode } = useTheme();
     const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
     const biometricEnabled = useAuthStore((s) => s.biometricEnabled);
     const setAuthenticated = useAuthStore((s) => s.setAuthenticated);
@@ -46,63 +52,95 @@ const LockOverlay: React.FC = () => {
         attemptUnlock();
     }, [isLocked, attemptUnlock]);
 
+    const bgGradient = mode === "light"
+        ? (["#FFFFFF", "#F0FDF4", "#FFFFFF"] as const)
+        : (["#0A0A12", "#1A0F1E", "#0A0A12"] as const);
+
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing.xxl,
+        },
+        iconWrap: {
+            shadowColor: palette.brand.primary,
+            shadowOpacity: 0.6,
+            shadowRadius: 30,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: 12,
+        },
+        iconBubble: {
+            width: 100,
+            height: 100,
+            borderRadius: 50,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        brand: {
+            ...typography.hero,
+            fontSize: 40,
+            color: palette.text.primary,
+            marginTop: spacing.xl,
+        },
+        subtitle: {
+            ...typography.body,
+            color: palette.text.secondary,
+            marginTop: 4,
+            marginBottom: spacing.xl,
+        },
+        error: {
+            ...typography.caption,
+            color: palette.semantic.danger,
+            marginBottom: spacing.md,
+            textAlign: "center",
+        },
+        buttonWrap: {
+            width: "100%",
+            maxWidth: 280,
+        },
+    }), [palette]);
+
     return (
         <Modal visible={isLocked} animationType="fade" transparent={false}>
-            <View style={styles.container}>
-                <Text style={styles.icon}>{BIOMETRIC_ICONS[biometricKind]}</Text>
-                <Text style={styles.title}>TapTrack</Text>
+            <LinearGradient
+                colors={bgGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.container}
+            >
+                <View style={styles.iconWrap}>
+                    <LinearGradient
+                        colors={gradients.brand}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.iconBubble}
+                    >
+                        <Feather
+                            name={BIOMETRIC_ICONS[biometricKind]}
+                            size={42}
+                            color="#FFFFFF"
+                        />
+                    </LinearGradient>
+                </View>
+
+                <Text style={styles.brand}>TapTrack</Text>
                 <Text style={styles.subtitle}>
                     Unlock with {BIOMETRIC_LABELS[biometricKind]}
                 </Text>
+
                 {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-                <TouchableOpacity style={styles.button} onPress={attemptUnlock}>
-                    <Text style={styles.buttonText}>Try again</Text>
-                </TouchableOpacity>
-            </View>
+
+                <View style={styles.buttonWrap}>
+                    <PrimaryButton
+                        label="Try again"
+                        onPress={attemptUnlock}
+                        icon={<Feather name="refresh-cw" size={18} color="#FFFFFF" />}
+                    />
+                </View>
+            </LinearGradient>
         </Modal>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#121218",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 32,
-    },
-    icon: {
-        fontSize: 64,
-        marginBottom: 16,
-    },
-    title: {
-        color: "#FFFFFF",
-        fontSize: 32,
-        fontWeight: "bold",
-        marginBottom: 4,
-    },
-    subtitle: {
-        color: "#AAAAAA",
-        fontSize: 16,
-        marginBottom: 24,
-    },
-    error: {
-        color: "#F87171",
-        fontSize: 13,
-        marginBottom: 16,
-        textAlign: "center",
-    },
-    button: {
-        backgroundColor: "#4ADE80",
-        borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 32,
-    },
-    buttonText: {
-        color: "#000000",
-        fontSize: 16,
-        fontWeight: "bold",
-    },
-});
 
 export default LockOverlay;

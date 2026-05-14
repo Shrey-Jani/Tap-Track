@@ -1,7 +1,12 @@
+import Card from "@/design/Card";
+import { spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
 import { RecurringPayment } from "@/services/RecurringPaymentDetector";
+import { useAppstore } from "@/store/appStore";
 import { formatCentstoDisplayCurrency } from "@/utils/formatCurrency";
+import { Feather } from "@expo/vector-icons";
 import { format } from "date-fns";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 interface RecurringMerchantsCardProps {
@@ -9,17 +14,84 @@ interface RecurringMerchantsCardProps {
 }
 
 const RecurringMerchantsCard: React.FC<RecurringMerchantsCardProps> = ({ recurringPayments }) => {
-    if (recurringPayments.length === 0) {
-        return null;
-    }
+    const { palette } = useTheme();
+    const currencyCode = useAppstore((s) => s.currencyCode);
+
+    const styles = useMemo(() => StyleSheet.create({
+        headerRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
+        title: {
+            ...typography.h3,
+            color: palette.text.primary,
+        },
+        subtitle: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginTop: 2,
+            marginBottom: spacing.md,
+        },
+        row: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingTop: spacing.md,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: palette.border.subtle,
+            marginTop: spacing.sm,
+        },
+        rowFirst: {
+            borderTopWidth: 0,
+            marginTop: 0,
+            paddingTop: 0,
+        },
+        left: { flex: 1 },
+        merchant: {
+            ...typography.bodyStrong,
+            color: palette.text.primary,
+        },
+        lastPaid: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginTop: 2,
+        },
+        right: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+        },
+        amount: {
+            ...typography.bodyStrong,
+            color: palette.brand.primary,
+            fontVariant: ["tabular-nums"],
+        },
+        freqPill: {
+            backgroundColor: palette.bg.elevated,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 999,
+        },
+        freqText: {
+            ...typography.caption,
+            color: palette.text.secondary,
+            fontWeight: "700",
+        },
+    }), [palette]);
+
+    if (recurringPayments.length === 0) return null;
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>🔁 Recurring Merchants</Text>
-            <Text style={styles.subtitle}>Merchants you've paid 3 or more times</Text>
+        <Card padding={spacing.lg}>
+            <View style={styles.headerRow}>
+                <Feather name="repeat" size={16} color={palette.brand.primary} />
+                <Text style={styles.title}>Recurring Merchants</Text>
+            </View>
+            <Text style={styles.subtitle}>Paid 3 or more times</Text>
 
-            {recurringPayments.map((rp) => (
-                <View key={rp.merchantName} style={styles.row}>
+            {recurringPayments.map((rp, idx) => (
+                <View key={rp.merchantName} style={[styles.row, idx === 0 && styles.rowFirst]}>
                     <View style={styles.left}>
                         <Text style={styles.merchant}>{rp.merchantName}</Text>
                         <Text style={styles.lastPaid}>
@@ -28,70 +100,16 @@ const RecurringMerchantsCard: React.FC<RecurringMerchantsCardProps> = ({ recurri
                     </View>
                     <View style={styles.right}>
                         <Text style={styles.amount}>
-                            {formatCentstoDisplayCurrency(rp.totalSpentInCents)}
+                            {formatCentstoDisplayCurrency(rp.totalSpentInCents, currencyCode)}
                         </Text>
-                        <Text style={styles.frequency}>
-                            {rp.frequency} payments
-                        </Text>
+                        <View style={styles.freqPill}>
+                            <Text style={styles.freqText}>×{rp.frequency}</Text>
+                        </View>
                     </View>
                 </View>
             ))}
-        </View>
+        </Card>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        backgroundColor: "#1E1E2E",
-        borderRadius: 16,
-        padding: 16,
-        marginTop: 20,
-    },
-    title: {
-        color: "#FFFFFF",
-        fontSize: 16,
-        fontWeight: "bold",
-        marginBottom: 4,
-    },
-    subtitle: {
-        color: "#888",
-        fontSize: 12,
-        marginBottom: 12,
-    },
-    row: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: 10,
-        borderTopWidth: 1,
-        borderTopColor: "#2A2A3C",
-    },
-    left: {
-        flex: 1,
-    },
-    merchant: {
-        color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "600",
-    },
-    lastPaid: {
-        color: "#888",
-        fontSize: 12,
-        marginTop: 2,
-    },
-    right: {
-        alignItems: "flex-end",
-    },
-    amount: {
-        color: "#4ADE80",
-        fontSize: 15,
-        fontWeight: "600",
-    },
-    frequency: {
-        color: "#888",
-        fontSize: 12,
-        marginTop: 2,
-    },
-});
 
 export default RecurringMerchantsCard;

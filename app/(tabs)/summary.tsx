@@ -1,211 +1,157 @@
-import { DailySummaryCard } from "@/components/DailySummaryCard";
+import DailySummaryCard from "@/components/DailySummaryCard";
 import RecurringMerchantsCard from "@/components/RecurringMerchantsCard";
 import SpendingChart from "@/components/SpendingChart";
 import SpendingTrendsCard from "@/components/SpendingTrendsCard";
+import Card from "@/design/Card";
+import PrimaryButton from "@/design/PrimaryButton";
+import { spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
 import { useDailySummary } from "@/hooks/useDailySummary";
 import { usePayments } from "@/hooks/usePayments";
 import { useRecurringPayments } from "@/hooks/useRecurringPayments";
 import { useSpendingTrends } from "@/hooks/useSpendingTrends";
-import { PaymentCategory } from "@/models/payment";
 import { exportDailySummaryAsPdf } from "@/services/PdfExportService";
-import { CATEGORY_ICONS } from "@/utils/constants";
+import { useAppstore } from "@/store/appStore";
 import { formatCentstoDisplayCurrency } from "@/utils/formatCurrency";
+import { Feather } from "@expo/vector-icons";
 import React, { useMemo } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 
 const SummaryScreen: React.FC = () => {
-  const { payment } = usePayments();
-  const summary = useDailySummary(payment);
-  const recurringPayments = useRecurringPayments();
-  const spendingTrends = useSpendingTrends();
+    const { palette } = useTheme();
+    const { payment } = usePayments();
+    const summary = useDailySummary(payment);
+    const recurringPayments = useRecurringPayments();
+    const spendingTrends = useSpendingTrends();
+    const currencyCode = useAppstore((s) => s.currencyCode);
 
-  const categoryEntries = Object.entries(summary.categoryBreakdown) as [
-    PaymentCategory,
-    number
-  ][];
+    const cardBreakdown = useMemo(() => {
+        const grouped: Record<string, { total: number; count: number }> = {};
+        payment.forEach((p) => {
+            if (!grouped[p.cardLastFourDigits]) {
+                grouped[p.cardLastFourDigits] = { total: 0, count: 0 };
+            }
+            grouped[p.cardLastFourDigits].total += p.amountInCents;
+            grouped[p.cardLastFourDigits].count += 1;
+        });
+        return Object.entries(grouped);
+    }, [payment]);
 
-  const nonZeroCategories = categoryEntries.filter(
-    ([, amount]) => amount > 0
-  );
+    const handleExportPdf = async () => {
+        try {
+            await exportDailySummaryAsPdf(summary, payment, summary.date);
+        } catch {
+            Alert.alert("Export Failed", "Could not generate PDF please try again");
+        }
+    };
 
-  const cardBreakdown = useMemo(() => {
-    const grouped:Record<string, {total: number, count: number}> = {};
-    payment.forEach((p) => {
-      if(!grouped[p.cardLastFourDigits]) {
-        grouped[p.cardLastFourDigits] = {total:0, count:0};
-    }
-    grouped[p.cardLastFourDigits].total += p.amountInCents;
-    grouped[p.cardLastFourDigits].count += 1;
-    });
-    return Object.entries(grouped);
-  }, [payment]);
+    const styles = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: palette.bg.base },
+        content: {
+            paddingTop: 60,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: 120,
+        },
+        title: {
+            ...typography.h1,
+            color: palette.text.primary,
+            marginBottom: spacing.lg,
+        },
+        gap: { height: spacing.md },
+        headerRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: spacing.md,
+        },
+        sectionTitle: {
+            ...typography.h3,
+            color: palette.text.primary,
+        },
+        cardRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingTop: spacing.md,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: palette.border.subtle,
+            marginTop: spacing.sm,
+        },
+        cardRowFirst: {
+            borderTopWidth: 0,
+            marginTop: 0,
+            paddingTop: 0,
+        },
+        cardChip: {
+            ...typography.bodyStrong,
+            color: palette.text.primary,
+            fontVariant: ["tabular-nums"],
+        },
+        cardRight: { alignItems: "flex-end" },
+        cardAmount: {
+            ...typography.bodyStrong,
+            color: palette.brand.primary,
+            fontVariant: ["tabular-nums"],
+        },
+        cardCount: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginTop: 2,
+        },
+    }), [palette]);
 
-  const handleExportPdf = async () => {
-    try{
-      await exportDailySummaryAsPdf(summary, payment, summary.date);
-    }
-    catch (error){
-      Alert.alert("Export Failed", "Could not generate PDF please try again");
-    }
-  };
+    return (
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+            <Text style={styles.title}>Insights</Text>
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
-      <Text style={styles.title}>Daily Breakdown</Text>
+            <DailySummaryCard summary={summary} />
 
-      <DailySummaryCard summary={summary} />
+            <View style={styles.gap} />
+            <SpendingTrendsCard trends={spendingTrends} />
 
-      <SpendingTrendsCard trends={spendingTrends} />
+            <View style={styles.gap} />
+            <SpendingChart categoryBreakdown={summary.categoryBreakdown} />
 
-      <SpendingChart categoryBreakdown={summary.categoryBreakdown} />
-      <Text style={styles.sectionTitle}>By Category</Text>
-
-      <View style={styles.categoryList}>
-        {nonZeroCategories.map(([category, amount]) => (
-          <View key={category} style={styles.categoryRow}>
-            <Text style={styles.categoryIcon}>
-              {CATEGORY_ICONS[category]}
-            </Text>
-            <Text style={styles.categoryName}>{category}</Text>
-            <Text style={styles.categoryAmount}>
-              {formatCentstoDisplayCurrency(amount)}
-            </Text>
-          </View>
-        ))}
-
-        {nonZeroCategories.length === 0 && (
-          <Text style={styles.emptyText}>No payments recorded today.</Text>
-        )}
-      </View>
-      {cardBreakdown.length > 0 && (
+            {cardBreakdown.length > 0 && (
                 <>
-                    <Text style={styles.sectionTitle}>By Card</Text>
-                    {cardBreakdown.map(([lastFour, data]) => (
-                        <View key={lastFour} style={styles.cardRow}>
-                            <Text style={styles.cardIcon}>💳</Text>
-                            <Text style={styles.cardNumber}>•••• {lastFour}</Text>
-                            <View style={styles.cardStats}>
-                                <Text style={styles.cardAmount}>
-                                    {formatCentstoDisplayCurrency(data.total)}
-                                </Text>
-                                <Text style={styles.cardCount}>{data.count} txn{data.count > 1 ? "s" : ""}</Text>
-                            </View>
+                    <View style={styles.gap} />
+                    <Card padding={spacing.lg}>
+                        <View style={styles.headerRow}>
+                            <Feather name="credit-card" size={16} color={palette.brand.primary} />
+                            <Text style={styles.sectionTitle}>By Card</Text>
                         </View>
-                    ))}
+                        {cardBreakdown.map(([lastFour, data], idx) => (
+                            <View
+                                key={lastFour}
+                                style={[styles.cardRow, idx === 0 && styles.cardRowFirst]}
+                            >
+                                <Text style={styles.cardChip}>•••• {lastFour}</Text>
+                                <View style={styles.cardRight}>
+                                    <Text style={styles.cardAmount}>
+                                        {formatCentstoDisplayCurrency(data.total, currencyCode)}
+                                    </Text>
+                                    <Text style={styles.cardCount}>
+                                        {data.count} txn{data.count > 1 ? "s" : ""}
+                                    </Text>
+                                </View>
+                            </View>
+                        ))}
+                    </Card>
                 </>
             )}
 
+            <View style={styles.gap} />
             <RecurringMerchantsCard recurringPayments={recurringPayments} />
 
-            <TouchableOpacity style={styles.exportButton} onPress={handleExportPdf}>
-                <Text style={styles.exportButtonText}>📄 Export as PDF</Text>
-            </TouchableOpacity>
-    </ScrollView>
-  );
+            <View style={[styles.gap, { marginTop: spacing.xl }]} />
+            <PrimaryButton
+                label="Export as PDF"
+                onPress={handleExportPdf}
+                variant="ghost"
+                icon={<Feather name="download" size={18} color={palette.brand.primary} />}
+            />
+        </ScrollView>
+    );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#121218",
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  title: {
-    color: "#FFFFFF",
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  sectionTitle: {
-        color: "#FFFFFF",
-        fontSize: 18,
-        fontWeight: "bold",
-        marginTop: 20,
-        marginBottom: 12,
-    },
-  categoryList: {
-    marginTop: 20,
-  },
-  categoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1E1E2E",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  categoryIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  categoryName: {
-    flex: 1,
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  categoryAmount: {
-    color: "#4ADE80",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  cardRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#1E1E2E",
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 10,
-    },
-  cardIcon: {
-        fontSize: 20,
-        marginRight: 12,
-    },
-    cardNumber: {
-        flex: 1,
-        color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "500",
-    },
-    cardStats: {
-        alignItems: "flex-end",
-    },
-    cardAmount: {
-        color: "#4ADE80",
-        fontSize: 15,
-        fontWeight: "600",
-    },
-    cardCount: {
-        color: "#888",
-        fontSize: 12,
-        marginTop: 2,
-    },  
-  emptyText: {
-    color: "#888",
-    textAlign: "center",
-    marginTop: 40,
-    fontSize: 15,
-  },
-  exportButton: {
-        backgroundColor: "#2A2A3C",
-        borderRadius: 12,
-        padding: 16,
-        alignItems: "center",
-        marginTop: 24,
-        borderWidth: 1,
-        borderColor: "#4ADE80",
-    },
-    exportButtonText: {
-        color: "#4ADE80",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-});
 
 export default SummaryScreen;

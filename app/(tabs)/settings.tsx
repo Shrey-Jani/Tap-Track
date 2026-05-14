@@ -1,11 +1,15 @@
-import {
-    authenticateWithBiometrics,
-    checkBiometricAvailability,
-} from "@/services/BiometricAuthService";
+import Card from "@/design/Card";
+import PrimaryButton from "@/design/PrimaryButton";
+import { radii, spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
 import {
     exportEncryptedBackup,
     importEncryptedBackup,
 } from "@/services/BackupService";
+import {
+    authenticateWithBiometrics,
+    checkBiometricAvailability,
+} from "@/services/BiometricAuthService";
 import {
     cancelEndOfDayReminder,
     dismissPersistentQuickAddNotification,
@@ -22,20 +26,22 @@ import {
 } from "@/services/NotificationService";
 import { useAppstore } from "@/store/appStore";
 import { useAuthStore } from "@/store/authStore";
+import { ThemePref, useThemeStore } from "@/store/themeStore";
 import { getCurrencyByCode, SUPPORTED_CURRENCIES } from "@/utils/currencies";
 import { formatCentstoDisplayCurrency } from "@/utils/formatCurrency";
+import { Feather } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     Alert,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
 } from "react-native";
 
@@ -45,7 +51,48 @@ const formatReminderTime = (time: ReminderTime): string => {
     return `${hh}:${mm}`;
 };
 
+interface SectionProps {
+    icon: React.ComponentProps<typeof Feather>["name"];
+    title: string;
+    children: React.ReactNode;
+}
+
+const Section: React.FC<SectionProps> = ({ icon, title, children }) => {
+    const { palette } = useTheme();
+    const styles = useMemo(() => StyleSheet.create({
+        section: { marginBottom: spacing.lg },
+        sectionHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: spacing.sm,
+            paddingHorizontal: 4,
+        },
+        sectionTitle: {
+            ...typography.label,
+            color: palette.text.secondary,
+        },
+    }), [palette]);
+
+    return (
+        <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+                <Feather name={icon} size={14} color={palette.brand.primary} />
+                <Text style={styles.sectionTitle}>{title}</Text>
+            </View>
+            <Card padding={spacing.lg}>{children}</Card>
+        </View>
+    );
+};
+
+const THEME_OPTIONS: { pref: ThemePref; label: string; icon: React.ComponentProps<typeof Feather>["name"] }[] = [
+    { pref: "system", label: "System", icon: "smartphone" },
+    { pref: "dark", label: "Dark", icon: "moon" },
+    { pref: "light", label: "Light", icon: "sun" },
+];
+
 const SettingsScreen: React.FC = () => {
+    const { palette, mode } = useTheme();
     const {
         dailyBudgetInCents,
         loadBudget,
@@ -57,6 +104,9 @@ const SettingsScreen: React.FC = () => {
 
     const biometricEnabled = useAuthStore((s) => s.biometricEnabled);
     const setBiometricEnabled = useAuthStore((s) => s.setBiometricEnabled);
+
+    const themePref = useThemeStore((s) => s.pref);
+    const setThemePref = useThemeStore((s) => s.setThemePref);
 
     const [budgetText, setBudgetText] = useState<string>("");
 
@@ -77,7 +127,7 @@ const SettingsScreen: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const loadNotificationSettings = async () => {
+        (async () => {
             const [persistent, reminder, time] = await Promise.all([
                 loadPersistentEnabled(),
                 loadReminderEnabled(),
@@ -86,8 +136,7 @@ const SettingsScreen: React.FC = () => {
             setPersistentEnabled(persistent);
             setReminderEnabled(reminder);
             setReminderTime(time);
-        };
-        loadNotificationSettings();
+        })();
     }, []);
 
     useEffect(() => {
@@ -102,7 +151,7 @@ const SettingsScreen: React.FC = () => {
         }
         const budgetInCents = Math.round(parsed * 100);
         saveBudget(budgetInCents);
-        Alert.alert("Budget Saved ✅", `Your daily budget is now ${formatCentstoDisplayCurrency(budgetInCents, currencyCode)}.`);
+        Alert.alert("Budget Saved", `Daily budget set to ${formatCentstoDisplayCurrency(budgetInCents, currencyCode)}.`);
     };
 
     const handleTogglePersistent = async (nextValue: boolean) => {
@@ -138,14 +187,10 @@ const SettingsScreen: React.FC = () => {
     const handleTimeChange = async (event: DateTimePickerEvent, date?: Date) => {
         setShowTimePicker(false);
         if (!date) return;
-
         const nextTime: ReminderTime = { hour: date.getHours(), minute: date.getMinutes() };
         setReminderTime(nextTime);
         await saveReminderTime(nextTime);
-
-        if (reminderEnabled) {
-            await scheduleEndOfDayReminder(nextTime);
-        }
+        if (reminderEnabled) await scheduleEndOfDayReminder(nextTime);
     };
 
     const handleToggleBiometric = async (nextValue: boolean) => {
@@ -157,7 +202,7 @@ const SettingsScreen: React.FC = () => {
             }
             const result = await authenticateWithBiometrics();
             if (!result.success) {
-                Alert.alert("Authentication Failed", "Couldn't verify identity. Lock not enabled.");
+                Alert.alert("Authentication Failed", "Couldn't verify identity.");
                 return;
             }
         }
@@ -174,7 +219,7 @@ const SettingsScreen: React.FC = () => {
             await exportEncryptedBackup(backupPassword);
             setShowBackupModal(false);
             setBackupPassword("");
-            Alert.alert("Backup Created ✅", "Save the file somewhere safe. You'll need the password to restore.");
+            Alert.alert("Backup Created", "Save it somewhere safe.");
         } catch (e) {
             Alert.alert("Backup Failed", e instanceof Error ? e.message : "Unknown error");
         }
@@ -188,7 +233,7 @@ const SettingsScreen: React.FC = () => {
             if (count === 0) {
                 Alert.alert("Cancelled", "No file selected.");
             } else {
-                Alert.alert("Restored ✅", `Imported ${count} payment${count === 1 ? "" : "s"}.`);
+                Alert.alert("Restored", `Imported ${count} payment${count === 1 ? "" : "s"}.`);
             }
         } catch (e) {
             Alert.alert("Restore Failed", e instanceof Error ? e.message : "Unknown error");
@@ -203,15 +248,241 @@ const SettingsScreen: React.FC = () => {
 
     const currentCurrency = getCurrencyByCode(currencyCode);
 
+    const styles = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: palette.bg.base },
+        content: { paddingTop: 60, paddingHorizontal: spacing.lg, paddingBottom: 120 },
+        title: {
+            ...typography.h1,
+            color: palette.text.primary,
+            marginBottom: spacing.lg,
+        },
+        hint: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginBottom: spacing.md,
+        },
+        subtle: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginTop: 6,
+        },
+        budgetRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: palette.bg.surfaceAlt,
+            borderRadius: radii.md,
+            paddingHorizontal: spacing.lg,
+        },
+        currencySymbol: {
+            color: palette.brand.primary,
+            fontSize: 32,
+            fontWeight: "800",
+            marginRight: 8,
+        },
+        budgetInput: {
+            flex: 1,
+            color: palette.text.primary,
+            fontSize: 32,
+            fontWeight: "800",
+            paddingVertical: 14,
+            fontVariant: ["tabular-nums"],
+        },
+        toggleRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: spacing.md,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: palette.border.subtle,
+            marginTop: 4,
+        },
+        toggleLeft: { flex: 1, marginRight: 12 },
+        toggleLabel: {
+            ...typography.bodyStrong,
+            color: palette.text.primary,
+            marginBottom: 2,
+        },
+        toggleHint: {
+            ...typography.caption,
+            color: palette.text.muted,
+        },
+        rowButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: spacing.md,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: palette.border.subtle,
+            marginTop: 4,
+        },
+        rowButtonLabel: {
+            ...typography.body,
+            color: palette.text.primary,
+        },
+        rowButtonRight: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+        },
+        rowButtonValue: {
+            ...typography.body,
+            color: palette.brand.primary,
+            fontWeight: "700",
+        },
+        footer: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginTop: spacing.md,
+            opacity: 0.6,
+        },
+        footerText: {
+            ...typography.caption,
+            color: palette.text.muted,
+        },
+        themeRow: {
+            flexDirection: "row",
+            gap: 8,
+        },
+        themeOption: {
+            flex: 1,
+            paddingVertical: 14,
+            paddingHorizontal: 8,
+            borderRadius: radii.md,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            backgroundColor: palette.bg.surfaceAlt,
+            borderWidth: 1,
+            borderColor: "transparent",
+        },
+        themeOptionActive: {
+            borderColor: palette.brand.primary,
+            backgroundColor: palette.bg.surface,
+        },
+        themeOptionLabel: {
+            ...typography.caption,
+            color: palette.text.secondary,
+            fontWeight: "600",
+        },
+        themeOptionLabelActive: {
+            color: palette.brand.primary,
+            fontWeight: "800",
+        },
+        modalBackdrop: {
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "center",
+            padding: 20,
+        },
+        modalCard: {
+            backgroundColor: palette.bg.surface,
+            borderRadius: radii.xl,
+            padding: spacing.lg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: palette.border.subtle,
+        },
+        modalTitle: {
+            ...typography.h2,
+            color: palette.text.primary,
+            marginBottom: 6,
+        },
+        modalHint: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginBottom: spacing.md,
+        },
+        modalInput: {
+            backgroundColor: palette.bg.surfaceAlt,
+            color: palette.text.primary,
+            padding: 14,
+            borderRadius: radii.md,
+            fontSize: 16,
+            marginBottom: spacing.md,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: palette.border.subtle,
+        },
+        currencyOption: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            padding: 14,
+            borderRadius: radii.md,
+            marginBottom: 6,
+            backgroundColor: palette.bg.surfaceAlt,
+        },
+        currencyOptionActive: {
+            borderWidth: 1,
+            borderColor: palette.brand.primary,
+        },
+        currencyOptionSymbol: {
+            color: palette.brand.primary,
+            fontSize: 22,
+            fontWeight: "800",
+            width: 30,
+            textAlign: "center",
+        },
+        currencyOptionName: {
+            ...typography.bodyStrong,
+            color: palette.text.primary,
+        },
+        currencyOptionCode: {
+            ...typography.caption,
+            color: palette.text.muted,
+            marginTop: 2,
+        },
+    }), [palette]);
+
+    const renderToggleRow = (
+        label: string,
+        hint: string,
+        value: boolean,
+        onChange: (v: boolean) => void,
+    ) => (
+        <View style={styles.toggleRow}>
+            <View style={styles.toggleLeft}>
+                <Text style={styles.toggleLabel}>{label}</Text>
+                <Text style={styles.toggleHint}>{hint}</Text>
+            </View>
+            <Switch
+                value={value}
+                onValueChange={onChange}
+                trackColor={{ false: palette.bg.elevated, true: palette.brand.primary }}
+                thumbColor="#FFFFFF"
+            />
+        </View>
+    );
+
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             <Text style={styles.title}>Settings</Text>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Daily Budget</Text>
-                <Text style={styles.sectionHint}>
-                    You'll get an alert when your daily spending exceeds this amount.
-                </Text>
+            <Section icon="sun" title="Appearance">
+                <Text style={styles.hint}>Pick the look. System follows your phone's settings.</Text>
+                <View style={styles.themeRow}>
+                    {THEME_OPTIONS.map((opt) => {
+                        const active = themePref === opt.pref;
+                        return (
+                            <Pressable
+                                key={opt.pref}
+                                style={[styles.themeOption, active && styles.themeOptionActive]}
+                                onPress={() => setThemePref(opt.pref)}
+                            >
+                                <Feather
+                                    name={opt.icon}
+                                    size={18}
+                                    color={active ? palette.brand.primary : palette.text.secondary}
+                                />
+                                <Text style={[styles.themeOptionLabel, active && styles.themeOptionLabelActive]}>
+                                    {opt.label}
+                                </Text>
+                            </Pressable>
+                        );
+                    })}
+                </View>
+            </Section>
+
+            <Section icon="target" title="Daily Budget">
+                <Text style={styles.hint}>Alert when daily spending exceeds this amount.</Text>
                 <View style={styles.budgetRow}>
                     <Text style={styles.currencySymbol}>{currentCurrency.symbol}</Text>
                     <TextInput
@@ -220,129 +491,103 @@ const SettingsScreen: React.FC = () => {
                         onChangeText={setBudgetText}
                         keyboardType="decimal-pad"
                         placeholder="100.00"
-                        placeholderTextColor="#555"
+                        placeholderTextColor={palette.text.muted}
                     />
                 </View>
-                <Text style={styles.currentBudget}>
+                <Text style={styles.subtle}>
                     Current: {formatCentstoDisplayCurrency(dailyBudgetInCents, currencyCode)}
                 </Text>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSaveBudget}>
-                    <Text style={styles.saveButtonText}>Save Budget</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Security</Text>
-                <View style={styles.toggleRow}>
-                    <View style={styles.toggleLeft}>
-                        <Text style={styles.toggleLabel}>Lock with biometric</Text>
-                        <Text style={styles.toggleHint}>
-                            Require Face ID / fingerprint after 30s in background.
-                        </Text>
-                    </View>
-                    <Switch
-                        value={biometricEnabled}
-                        onValueChange={handleToggleBiometric}
-                        trackColor={{ false: "#3A3A4C", true: "#4ADE80" }}
-                        thumbColor="#FFFFFF"
-                    />
+                <View style={{ marginTop: spacing.md }}>
+                    <PrimaryButton label="Save Budget" onPress={handleSaveBudget} />
                 </View>
-            </View>
+            </Section>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Currency</Text>
-                <TouchableOpacity style={styles.rowButton} onPress={() => setShowCurrencyPicker(true)}>
-                    <Text style={styles.rowButtonLabel}>Display currency</Text>
-                    <Text style={styles.rowButtonValue}>{currentCurrency.code} ({currentCurrency.symbol})</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Notifications</Text>
-
-                <View style={styles.toggleRow}>
-                    <View style={styles.toggleLeft}>
-                        <Text style={styles.toggleLabel}>Persistent Quick-Add</Text>
-                        <Text style={styles.toggleHint}>
-                            Always-visible notification to log a payment fast.
-                            {Platform.OS === "ios" ? " (iOS: re-posts on app open)" : ""}
-                        </Text>
-                    </View>
-                    <Switch
-                        value={persistentEnabled}
-                        onValueChange={handleTogglePersistent}
-                        trackColor={{ false: "#3A3A4C", true: "#4ADE80" }}
-                        thumbColor="#FFFFFF"
-                    />
-                </View>
-
-                <View style={styles.toggleRow}>
-                    <View style={styles.toggleLeft}>
-                        <Text style={styles.toggleLabel}>End-of-Day Reminder</Text>
-                        <Text style={styles.toggleHint}>
-                            Daily nudge to check you've logged everything.
-                        </Text>
-                    </View>
-                    <Switch
-                        value={reminderEnabled}
-                        onValueChange={handleToggleReminder}
-                        trackColor={{ false: "#3A3A4C", true: "#4ADE80" }}
-                        thumbColor="#FFFFFF"
-                    />
-                </View>
-
-                {reminderEnabled && (
-                    <TouchableOpacity style={styles.timeButton} onPress={() => setShowTimePicker(true)}>
-                        <Text style={styles.timeButtonLabel}>Remind me at</Text>
-                        <Text style={styles.timeButtonValue}>{formatReminderTime(reminderTime)}</Text>
-                    </TouchableOpacity>
+            <Section icon="shield" title="Security">
+                {renderToggleRow(
+                    "Lock with biometric",
+                    "Face ID / fingerprint after 30s in background.",
+                    biometricEnabled,
+                    handleToggleBiometric,
                 )}
+            </Section>
 
+            <Section icon="dollar-sign" title="Currency">
+                <Pressable style={styles.rowButton} onPress={() => setShowCurrencyPicker(true)}>
+                    <Text style={styles.rowButtonLabel}>Display currency</Text>
+                    <View style={styles.rowButtonRight}>
+                        <Text style={styles.rowButtonValue}>{currentCurrency.code}</Text>
+                        <Feather name="chevron-right" size={18} color={palette.text.muted} />
+                    </View>
+                </Pressable>
+            </Section>
+
+            <Section icon="bell" title="Notifications">
+                {renderToggleRow(
+                    "Persistent Quick-Add",
+                    Platform.OS === "ios"
+                        ? "Always-visible notification (re-posts on app open)."
+                        : "Sticky notification in tray for fast logging.",
+                    persistentEnabled,
+                    handleTogglePersistent,
+                )}
+                {renderToggleRow(
+                    "End-of-Day Reminder",
+                    "Daily nudge to log everything.",
+                    reminderEnabled,
+                    handleToggleReminder,
+                )}
+                {reminderEnabled && (
+                    <Pressable style={styles.rowButton} onPress={() => setShowTimePicker(true)}>
+                        <Text style={styles.rowButtonLabel}>Remind me at</Text>
+                        <View style={styles.rowButtonRight}>
+                            <Text style={styles.rowButtonValue}>{formatReminderTime(reminderTime)}</Text>
+                            <Feather name="clock" size={16} color={palette.text.muted} />
+                        </View>
+                    </Pressable>
+                )}
                 {showTimePicker && (
                     <DateTimePicker
                         value={reminderTimeAsDate}
                         mode="time"
                         display={Platform.OS === "ios" ? "spinner" : "default"}
                         onChange={handleTimeChange}
-                        themeVariant="dark"
+                        themeVariant={mode}
                     />
                 )}
-            </View>
+            </Section>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Backup & Restore</Text>
-                <Text style={styles.sectionHint}>
-                    Export an encrypted backup file. Keep the password — without it, the file cannot be restored.
+            <Section icon="hard-drive" title="Backup & Restore">
+                <Text style={styles.hint}>
+                    Encrypted backup. Keep the password — without it, the file can't be restored.
                 </Text>
-                <TouchableOpacity
+                <Pressable
                     style={styles.rowButton}
                     onPress={() => { setBackupPassword(""); setShowBackupModal(true); }}
                 >
                     <Text style={styles.rowButtonLabel}>Export encrypted backup</Text>
-                    <Text style={styles.rowButtonValue}>↗</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                    <Feather name="upload" size={18} color={palette.brand.primary} />
+                </Pressable>
+                <Pressable
                     style={styles.rowButton}
                     onPress={() => { setBackupPassword(""); setShowRestoreModal(true); }}
                 >
                     <Text style={styles.rowButtonLabel}>Restore from backup</Text>
-                    <Text style={styles.rowButtonValue}>↘</Text>
-                </TouchableOpacity>
-            </View>
+                    <Feather name="download" size={18} color={palette.brand.primary} />
+                </Pressable>
+            </Section>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>App Info</Text>
-                <Text style={styles.settingItem}>Currency: {currentCurrency.name} ({currentCurrency.code})</Text>
-                <Text style={styles.settingItem}>Version: 1.0.0</Text>
+            <View style={styles.footer}>
+                <Text style={styles.footerText}>TapTrack · v1.0.0</Text>
+                <Text style={styles.footerText}>{currentCurrency.name}</Text>
             </View>
 
             <Modal visible={showCurrencyPicker} animationType="slide" transparent>
-                <View style={styles.modalBackdrop}>
-                    <View style={styles.modalCard}>
+                <Pressable style={styles.modalBackdrop} onPress={() => setShowCurrencyPicker(false)}>
+                    <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
                         <Text style={styles.modalTitle}>Pick Currency</Text>
-                        <ScrollView style={styles.currencyList}>
+                        <ScrollView style={{ maxHeight: 360 }}>
                             {SUPPORTED_CURRENCIES.map((c) => (
-                                <TouchableOpacity
+                                <Pressable
                                     key={c.code}
                                     style={[
                                         styles.currencyOption,
@@ -350,153 +595,62 @@ const SettingsScreen: React.FC = () => {
                                     ]}
                                     onPress={() => handlePickCurrency(c.code)}
                                 >
-                                    <Text style={styles.currencyOptionText}>
-                                        {c.symbol}  {c.code} — {c.name}
-                                    </Text>
-                                </TouchableOpacity>
+                                    <Text style={styles.currencyOptionSymbol}>{c.symbol}</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.currencyOptionName}>{c.name}</Text>
+                                        <Text style={styles.currencyOptionCode}>{c.code}</Text>
+                                    </View>
+                                    {c.code === currencyCode && (
+                                        <Feather name="check" size={18} color={palette.brand.primary} />
+                                    )}
+                                </Pressable>
                             ))}
                         </ScrollView>
-                        <TouchableOpacity style={styles.modalCancel} onPress={() => setShowCurrencyPicker(false)}>
-                            <Text style={styles.modalCancelText}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                    </Pressable>
+                </Pressable>
             </Modal>
 
             <Modal visible={showBackupModal} animationType="slide" transparent>
-                <View style={styles.modalBackdrop}>
-                    <View style={styles.modalCard}>
+                <Pressable style={styles.modalBackdrop} onPress={() => setShowBackupModal(false)}>
+                    <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
                         <Text style={styles.modalTitle}>Encrypted Backup</Text>
                         <Text style={styles.modalHint}>
-                            Set a password to encrypt your backup. Min 4 characters. You'll need this exact password to restore.
+                            Min 4 characters. You'll need this exact password to restore.
                         </Text>
                         <TextInput
                             style={styles.modalInput}
                             placeholder="Backup password"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={palette.text.muted}
                             secureTextEntry
                             value={backupPassword}
                             onChangeText={setBackupPassword}
                         />
-                        <View style={styles.modalRow}>
-                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowBackupModal(false)}>
-                                <Text style={styles.modalCancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleExportBackup}>
-                                <Text style={styles.modalConfirmText}>Export</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
+                        <PrimaryButton label="Export" onPress={handleExportBackup} />
+                    </Pressable>
+                </Pressable>
             </Modal>
 
             <Modal visible={showRestoreModal} animationType="slide" transparent>
-                <View style={styles.modalBackdrop}>
-                    <View style={styles.modalCard}>
+                <Pressable style={styles.modalBackdrop} onPress={() => setShowRestoreModal(false)}>
+                    <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
                         <Text style={styles.modalTitle}>Restore Backup</Text>
                         <Text style={styles.modalHint}>
-                            Enter the backup password, then pick the backup file. This will overwrite all current payments.
+                            Enter the backup password, then pick the file. This overwrites all current payments.
                         </Text>
                         <TextInput
                             style={styles.modalInput}
                             placeholder="Backup password"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={palette.text.muted}
                             secureTextEntry
                             value={backupPassword}
                             onChangeText={setBackupPassword}
                         />
-                        <View style={styles.modalRow}>
-                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowRestoreModal(false)}>
-                                <Text style={styles.modalCancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleImportBackup}>
-                                <Text style={styles.modalConfirmText}>Pick File</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
+                        <PrimaryButton label="Pick File" onPress={handleImportBackup} />
+                    </Pressable>
+                </Pressable>
             </Modal>
         </ScrollView>
     );
 };
-
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#121218" },
-    content: { padding: 16, paddingBottom: 40 },
-    title: { color: "#FFFFFF", fontSize: 28, fontWeight: "bold", marginBottom: 24 },
-    section: { marginBottom: 28 },
-    sectionTitle: {
-        color: "#4ADE80", fontSize: 14, fontWeight: "600",
-        textTransform: "uppercase", letterSpacing: 1, marginBottom: 6,
-    },
-    sectionHint: { color: "#888", fontSize: 13, marginBottom: 12 },
-    budgetRow: {
-        flexDirection: "row", alignItems: "center",
-        backgroundColor: "#1E1E2E", borderRadius: 12, paddingHorizontal: 16,
-    },
-    currencySymbol: { color: "#4ADE80", fontSize: 28, fontWeight: "bold", marginRight: 8 },
-    budgetInput: { flex: 1, color: "#FFFFFF", fontSize: 28, paddingVertical: 16 },
-    currentBudget: { color: "#888", fontSize: 13, marginTop: 8 },
-    saveButton: {
-        backgroundColor: "#4ADE80", borderRadius: 12, padding: 14,
-        alignItems: "center", marginTop: 12,
-    },
-    saveButtonText: { color: "#000000", fontSize: 16, fontWeight: "bold" },
-    settingItem: {
-        color: "#FFFFFF", fontSize: 16, marginBottom: 10,
-        backgroundColor: "#1E1E2E", padding: 14, borderRadius: 12,
-    },
-    toggleRow: {
-        flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-        backgroundColor: "#1E1E2E", borderRadius: 12, padding: 14, marginBottom: 10,
-    },
-    toggleLeft: { flex: 1, marginRight: 12 },
-    toggleLabel: { color: "#FFFFFF", fontSize: 15, fontWeight: "600", marginBottom: 4 },
-    toggleHint: { color: "#888", fontSize: 12 },
-    timeButton: {
-        flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-        backgroundColor: "#1E1E2E", borderRadius: 12, padding: 14, marginTop: 2,
-    },
-    timeButtonLabel: { color: "#FFFFFF", fontSize: 15 },
-    timeButtonValue: { color: "#4ADE80", fontSize: 18, fontWeight: "700" },
-    rowButton: {
-        flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-        backgroundColor: "#1E1E2E", borderRadius: 12, padding: 14, marginBottom: 10,
-    },
-    rowButtonLabel: { color: "#FFFFFF", fontSize: 15 },
-    rowButtonValue: { color: "#4ADE80", fontSize: 15, fontWeight: "600" },
-    modalBackdrop: {
-        flex: 1, backgroundColor: "rgba(0,0,0,0.7)",
-        justifyContent: "center", padding: 20,
-    },
-    modalCard: { backgroundColor: "#1E1E2E", borderRadius: 16, padding: 20 },
-    modalTitle: { color: "#FFFFFF", fontSize: 20, fontWeight: "bold", marginBottom: 8 },
-    modalHint: { color: "#888", fontSize: 13, marginBottom: 16 },
-    modalInput: {
-        backgroundColor: "#2A2A3C", color: "#FFFFFF", padding: 14,
-        borderRadius: 12, fontSize: 16, marginBottom: 12,
-    },
-    modalRow: { flexDirection: "row", justifyContent: "space-between" },
-    modalCancelBtn: {
-        flex: 1, backgroundColor: "#2A2A3C", padding: 14,
-        borderRadius: 12, alignItems: "center", marginRight: 8,
-    },
-    modalCancel: {
-        backgroundColor: "#2A2A3C", padding: 14,
-        borderRadius: 12, alignItems: "center", marginTop: 8,
-    },
-    modalCancelText: { color: "#FFFFFF", fontSize: 15 },
-    modalConfirmBtn: {
-        flex: 1, backgroundColor: "#4ADE80", padding: 14,
-        borderRadius: 12, alignItems: "center", marginLeft: 8,
-    },
-    modalConfirmText: { color: "#000", fontSize: 15, fontWeight: "bold" },
-    currencyList: { maxHeight: 320 },
-    currencyOption: {
-        padding: 14, borderRadius: 10, marginBottom: 6, backgroundColor: "#2A2A3C",
-    },
-    currencyOptionActive: { borderWidth: 1, borderColor: "#4ADE80" },
-    currencyOptionText: { color: "#FFFFFF", fontSize: 15 },
-});
 
 export default SettingsScreen;

@@ -9,7 +9,7 @@ import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import LockOverlay from '@/components/LockOverlay';
-import { useColorScheme } from '@/components/useColorScheme';
+import { useTheme } from '@/design/useTheme';
 import {
   configureNotificationHandler,
   loadPersistentEnabled,
@@ -18,6 +18,7 @@ import {
 } from '@/services/NotificationService';
 import { refreshSpendingWidget } from '@/services/WidgetService';
 import { useAuthStore } from '@/store/authStore';
+import { useThemeStore } from '@/store/themeStore';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -61,6 +62,7 @@ export default function RootLayout() {
     refreshSpendingWidget().catch(() => undefined);
 
     useAuthStore.getState().loadBiometricEnabled();
+    useThemeStore.getState().loadThemePref();
 
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) {
@@ -108,10 +110,10 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const { mode } = useTheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={mode === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />

@@ -1,55 +1,98 @@
+import { radii, spacing, typography } from "@/design/theme";
+import { useTheme } from "@/design/useTheme";
+import { Feather } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { addDays, format, isToday, subDays } from "date-fns";
-import React, { useState } from "react";
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
+import * as Haptics from "expo-haptics";
+import React, { useMemo, useState } from "react";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface DateRangePickerProps {
     selectedDate: Date;
-    onDateChange: (date: Date) => void;  
+    onDateChange: (date: Date) => void;
 }
 
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ selectedDate, onDateChange }) => {
+    const { palette, mode } = useTheme();
     const [showPicker, setShowPicker] = useState<boolean>(false);
+    const atToday = isToday(selectedDate);
 
     const goToPreviousDay = () => {
+        Haptics.selectionAsync().catch(() => undefined);
         onDateChange(subDays(selectedDate, 1));
     };
 
     const goToNextDay = () => {
-        if (!isToday(selectedDate)) {
+        if (!atToday) {
+            Haptics.selectionAsync().catch(() => undefined);
             onDateChange(addDays(selectedDate, 1));
         }
     };
 
     const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
         setShowPicker(false);
-        if (date) {
-            onDateChange(date);
-        }
+        if (date) onDateChange(date);
     };
 
-    const formattedDate = isToday(selectedDate)
-        ? "Today"
-        : format(selectedDate, "MMM dd, yyyy");
+    const formattedDate = atToday ? "Today" : format(selectedDate, "EEE, MMM dd");
+
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: palette.bg.surface,
+            borderRadius: radii.pill,
+            padding: 4,
+            marginBottom: spacing.md,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: palette.border.subtle,
+        },
+        arrowButton: {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        arrowDisabled: { opacity: 0.4 },
+        dateButton: {
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            paddingVertical: 8,
+        },
+        dateText: {
+            ...typography.h3,
+            color: palette.text.primary,
+        },
+    }), [palette]);
 
     return (
         <View style={styles.container}>
-            <TouchableOpacity onPress={goToPreviousDay} style={styles.arrowButton}>
-                <Text style={styles.arrowText}>◀</Text>
-            </TouchableOpacity>
+            <Pressable onPress={goToPreviousDay} style={styles.arrowButton} hitSlop={8}>
+                <Feather name="chevron-left" size={20} color={palette.brand.primary} />
+            </Pressable>
 
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={styles.dateButton}>
+            <Pressable onPress={() => setShowPicker(true)} style={styles.dateButton}>
+                <Feather name="calendar" size={14} color={palette.text.secondary} />
                 <Text style={styles.dateText}>{formattedDate}</Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
+            <Pressable
                 onPress={goToNextDay}
-                style={[styles.arrowButton, isToday(selectedDate) && styles.arrowDisabled]}
-                disabled={isToday(selectedDate)}
+                style={[styles.arrowButton, atToday && styles.arrowDisabled]}
+                disabled={atToday}
+                hitSlop={8}
             >
-                <Text style={[styles.arrowText, isToday(selectedDate) && styles.arrowTextDisabled]}>▶</Text>
-            </TouchableOpacity>
+                <Feather
+                    name="chevron-right"
+                    size={20}
+                    color={atToday ? palette.text.muted : palette.brand.primary}
+                />
+            </Pressable>
 
             {showPicker && (
                 <DateTimePicker
@@ -58,53 +101,11 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ selectedDate, onDateC
                     display={Platform.OS === "ios" ? "inline" : "default"}
                     maximumDate={new Date()}
                     onChange={handleDateChange}
-                    themeVariant="dark"
+                    themeVariant={mode}
                 />
             )}
         </View>
     );
 };
-
-
-const styles = StyleSheet.create({
-    container:{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#1E1E2E",
-        borderRadius: 12,
-        padding: 8,
-        marginBottom: 12,
-    },
-    arrowButton: {
-        padding: 12,
-    },
-
-    arrowText: {
-        color: "#4ADE80",
-        fontSize:18,
-        fontWeight:"bold",
-    },
-
-    arrowDisabled: {
-        opacity: 0.3,
-    },
-
-    arrowTextDisabled: {
-        color: "#888",
-    },
-
-    dateButton : {
-        flex: 1,
-        alignItems: "center",
-        paddingVertical: 8,
-    },
-
-    dateText: {
-        color: "#FFFFFF",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-});
 
 export default DateRangePicker;
