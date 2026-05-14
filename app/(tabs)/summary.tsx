@@ -1,7 +1,11 @@
 import { DailySummaryCard } from "@/components/DailySummaryCard";
+import RecurringMerchantsCard from "@/components/RecurringMerchantsCard";
 import SpendingChart from "@/components/SpendingChart";
+import SpendingTrendsCard from "@/components/SpendingTrendsCard";
 import { useDailySummary } from "@/hooks/useDailySummary";
 import { usePayments } from "@/hooks/usePayments";
+import { useRecurringPayments } from "@/hooks/useRecurringPayments";
+import { useSpendingTrends } from "@/hooks/useSpendingTrends";
 import { PaymentCategory } from "@/models/payment";
 import { exportDailySummaryAsPdf } from "@/services/PdfExportService";
 import { CATEGORY_ICONS } from "@/utils/constants";
@@ -12,6 +16,8 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 const SummaryScreen: React.FC = () => {
   const { payment } = usePayments();
   const summary = useDailySummary(payment);
+  const recurringPayments = useRecurringPayments();
+  const spendingTrends = useSpendingTrends();
 
   const categoryEntries = Object.entries(summary.categoryBreakdown) as [
     PaymentCategory,
@@ -52,6 +58,8 @@ const SummaryScreen: React.FC = () => {
 
       <DailySummaryCard summary={summary} />
 
+      <SpendingTrendsCard trends={spendingTrends} />
+
       <SpendingChart categoryBreakdown={summary.categoryBreakdown} />
       <Text style={styles.sectionTitle}>By Category</Text>
 
@@ -89,6 +97,8 @@ const SummaryScreen: React.FC = () => {
                     ))}
                 </>
             )}
+
+            <RecurringMerchantsCard recurringPayments={recurringPayments} />
 
             <TouchableOpacity style={styles.exportButton} onPress={handleExportPdf}>
                 <Text style={styles.exportButtonText}>📄 Export as PDF</Text>
